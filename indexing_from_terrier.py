@@ -1,7 +1,6 @@
 from collection import SparseCollection, SparseCollectionCSR
 from backend import TYPE
 import json
-import psutil
 from text2vec import BagOfWords
 import torch
 from collections import defaultdict

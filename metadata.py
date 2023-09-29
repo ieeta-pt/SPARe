@@ -1,28 +1,49 @@
 from collections import defaultdict
 import json
 
-class MetaDataDFandDL:
-    # stores the doc freq and doc len as metadata for future usage
+class MetaDataDocID:
+    # stores a mapping for the doc_ID
     def __init__(self) -> None:
-        self.df = defaultdict(int)
-        self.dl = {}
+        self.index2docID = {}
         
-    def update(self, doc_id, term_ids, values):
-        self.dl[doc_id] = sum(values)
-        for term_id in term_ids:
-            self.df[term_id] += 1
-            
+    def register_docid(self, index, docID):
+        self.index2docID[index] = docID
+
+    def _get_vars_to_save(self):
+        return {"index2docID": self.index2docID}
+    
     def save_to_file(self, file_name):
         with open(file_name, "w") as f:
-            json.dump({
-                "df": self.df,
-                "dl": self.dl
-                }, f)
-            
+            json.dump(self._get_vars_to_save(), f)
+    
+    def _load_vars(self, data):
+        self.index2docID = data.pop("index2docID")
+    
     def load_from_file(self, file_name):
         with open(file_name) as f:
             data = json.load(f)
         
-        self.df = data["df"]
-        self.dl = data["dl"]
-            
+        self._load_vars(data)
+        
+class MetaDataDFandDL(MetaDataDocID):
+    # stores the doc freq and doc len as metadata for future usage
+    def __init__(self) -> None:
+        super().__init__()
+        self.df = defaultdict(int)
+        self.dl = {}
+        
+    def update(self, index_doc, term_ids, values):
+        self.dl[index_doc] = sum(values)
+        for term_id in term_ids:
+            self.df[term_id] += 1
+    
+    def _get_vars_to_save(self):
+        return super()._get_vars_to_save() | {
+            "df": self.df,
+            "dl": self.dl
+            } 
+
+    def _load_vars(self, data):
+        self.df = data.pop("df")
+        self.dl = data.pop("dl")
+        self._load_vars(data)

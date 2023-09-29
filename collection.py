@@ -114,7 +114,8 @@ class SparseCollection:
         index_docs = 0
         
         ## add values for the current processed documents in the list_bow_for_estimation list
-        for bow in list_bow_for_estimation:
+        for doc_id, bow in list_bow_for_estimation:
+            self.metadata.register_docid(index_docs ,doc_id)
             elements_added = self._update_sparse_vecs(*sparse_vecs, bow, element_index, index_docs)
 
             element_index += elements_added
@@ -123,10 +124,12 @@ class SparseCollection:
             del bow
         
         ## read the reminder of the collection
-        for bow_or_text in tqdm(iterator, total=collection_maxsize-len(list_bow_for_estimation), desc="Creating sparse matrix"):
+        for doc_id, bow_or_text in tqdm(iterator, total=collection_maxsize-len(list_bow_for_estimation), desc="Creating sparse matrix"):
             
             if index_docs>=collection_maxsize:
                 break
+            
+            self.metadata.register_docid(index_docs ,doc_id)
             
             if self.text_to_vec is None:
                 bow = bow_or_text
@@ -199,7 +202,7 @@ class SparseCollection:
         
 
         dense_size = self.vec_dim*len(sampled_bow_list)
-        density = sum([sum(bow.values()) for bow in sampled_bow_list])/dense_size
+        density = sum([sum(bow.values()) for _, bow in sampled_bow_list])/dense_size
         shape = (self.collection_maxsize, self.vec_dim)
 
         return shape, density
