@@ -219,7 +219,7 @@ class SparseCollection:
         if os.path.exists(folder_name):
             shutil.rmtree(folder_name)
         os.makedirs(folder_name)
-        self.metadata.save_to_file(os.path.join(folder_name, "metadata.json"))
+        self.metadata.save_to_file(os.path.join(folder_name, "metadata.p"))
         self.backend.save_tensors_to_file(self.sparse_vecs, os.path.join(folder_name, "tensors.safetensors"))
         
         class_vars = self._get_class_attributes()
@@ -240,7 +240,7 @@ class SparseCollection:
         sparse_collection.nnz = nnz
         sparse_collection.shape = shape
         
-        sparse_collection.metadata.load_from_file(os.path.join(folder_name, "metadata.json"))
+        sparse_collection.metadata.load_from_file(os.path.join(folder_name, "metadata.p"))
         
         sparse_collection.sparse_vecs = sparse_collection.backend.load_tensors_from_file(os.path.join(folder_name, "tensors.safetensors"))
         

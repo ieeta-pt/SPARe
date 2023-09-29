@@ -1,5 +1,5 @@
 from collections import defaultdict
-import json
+import pickle
 
 class MetaDataDocID:
     # stores a mapping for the doc_ID
@@ -13,15 +13,15 @@ class MetaDataDocID:
         return {"index2docID": self.index2docID}
     
     def save_to_file(self, file_name):
-        with open(file_name, "w") as f:
-            json.dump(self._get_vars_to_save(), f)
+        with open(file_name, "wb") as f:
+            pickle.dump(self._get_vars_to_save(), f)
     
     def _load_vars(self, data):
         self.index2docID = data.pop("index2docID")
     
     def load_from_file(self, file_name):
-        with open(file_name) as f:
-            data = json.load(f)
+        with open(file_name, "rb") as f:
+            data = pickle.load(f)
         
         self._load_vars(data)
         
