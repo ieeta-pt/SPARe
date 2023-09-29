@@ -46,4 +46,4 @@ class MetaDataDFandDL(MetaDataDocID):
     def _load_vars(self, data):
         self.df = data.pop("df")
         self.dl = data.pop("dl")
-        self._load_vars(data)
+        super()._load_vars(data)
