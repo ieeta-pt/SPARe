@@ -1,4 +1,21 @@
 from backend import TYPE
+import math
+
+
+LOG_E_OF_2 = math.log(2)
+LOG_2_OF_E = 1 / LOG_E_OF_2
+
+def log2(x):
+    return math.log(x) * LOG_2_OF_E
+
+
+def terrier_idf(x, collection_size):
+    # how terrier computes idf according to its java source code
+    return log2((collection_size-x*0.5)/(x+0.5))
+
+def idf_weighting(x, collection_size):
+    #https://en.wikipedia.org/wiki/Okapi_BM25
+    return math.log((collection_size-x+0.5)/(x+0.5)+1)
 
 def get_bytes_in_dtype(dtype):
     if dtype == TYPE.float32:

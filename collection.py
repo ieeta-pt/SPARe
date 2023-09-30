@@ -4,8 +4,9 @@ from utils import get_coo_sparce_GB, get_csr_sparce_GB
 from tqdm import tqdm
 from metadata import MetaDataDFandDL
 import os
-import json
+import jsonpickle
 import shutil
+from weighting_model import WeightingSchemaType, CountingWeightingSchema
 
 class SparseCollection:
     ### implements a COO sparse matrix
@@ -15,13 +16,16 @@ class SparseCollection:
                  vec_dim=None,
                  dtype=TYPE.float32, 
                  metadata=MetaDataDFandDL,
+                 weighting_schema=CountingWeightingSchema,
                  backend="torch") -> None:
         super().__init__()
 
         self.collection_maxsize = collection_maxsize
+                
         if isinstance(dtype, int):  
             dtype = TYPE(dtype)
         self.dtype = dtype
+        
         self.text_to_vec = text_to_vec
         
         if vec_dim is None and text_to_vec is None:
@@ -38,6 +42,7 @@ class SparseCollection:
             RuntimeError("Only torch backend is currently supported")
         
         self.metadata = metadata()
+        self.weighting_schema = weighting_schema()
             
     @classmethod
     def from_text_iterator(cls,
@@ -75,9 +80,14 @@ class SparseCollection:
         
         return sparse_collection
     
-    def transform(self, transform_operator):        
-        self._correct_transform_operator(transform_operator).convert(*self.sparse_vecs, self.shape, self.nnz, self.metadata, self.dtype, self.backend)
-
+    def transform(self, transform_operator):
+        if transform_operator.is_compatible(self):
+            self._correct_transform_operator(transform_operator).convert(*self.sparse_vecs, self.shape, self.nnz, self.metadata, self.dtype, self.backend)
+            # update the weighing schema.
+            self.weighting_schema = transform_operator.get_weighting_schema()
+        else:
+            raise ValueError("Your current collection weighing schema or metadata is not compatible with the transformation asked.")
+            
     def _correct_transform_operator(self, transform_operator):
         return transform_operator.for_coo()
     
@@ -86,7 +96,9 @@ class SparseCollection:
         if self.text_to_vec is None:
             list_bow_for_estimation = [next(iterator) for _ in tqdm(range(max_files_for_estimation), desc="Size estimation")]
         else:
-            list_bow_for_estimation = [self.text_to_vec(next(iterator)) for _ in tqdm(range(max_files_for_estimation), desc="Size estimation")]
+            def remap(docid, text):
+                return docid, self.text_to_vec(text)
+            list_bow_for_estimation = [remap(*next(iterator)) for _ in tqdm(range(max_files_for_estimation), desc="Size estimation")]
         
         shape, density = self._get_matrix_estimations(list_bow_for_estimation)
         self.shape = shape
@@ -115,6 +127,7 @@ class SparseCollection:
         
         ## add values for the current processed documents in the list_bow_for_estimation list
         for doc_id, bow in list_bow_for_estimation:
+
             self.metadata.register_docid(index_docs ,doc_id)
             elements_added = self._update_sparse_vecs(*sparse_vecs, bow, element_index, index_docs)
 
@@ -212,7 +225,9 @@ class SparseCollection:
                       "shape": self.shape,
                       "collection_maxsize": self.collection_maxsize,
                       "dtype": self.dtype.value,
-                      "vec_dim": self.vec_dim
+                      "vec_dim": self.vec_dim,
+                      "weighting_schema": self.weighting_schema.__class__,
+                      "metadata": self.metadata.__class__
                       }
     
     def save_to_file(self, folder_name):
@@ -220,18 +235,19 @@ class SparseCollection:
             shutil.rmtree(folder_name)
         os.makedirs(folder_name)
         self.metadata.save_to_file(os.path.join(folder_name, "metadata.p"))
+        self.weighting_schema.save_to_file(os.path.join(folder_name, "weight_schema.jsonpickle"))
         self.backend.save_tensors_to_file(self.sparse_vecs, os.path.join(folder_name, "tensors.safetensors"))
         
-        class_vars = self._get_class_attributes()
+        class_vars = jsonpickle.encode(self._get_class_attributes())
         
-        with open(os.path.join(folder_name, "class_info.json"), "w") as f:
-            json.dump(class_vars, f)
+        with open(os.path.join(folder_name, "class_info.jsonpickle"), "w") as f:
+            f.write(class_vars)
     
     @classmethod    
     def load_from_file(cls, folder_name, backend="torch"):
         
-        with open(os.path.join(folder_name, "class_info.json")) as f:
-            class_vars = json.load(f)
+        with open(os.path.join(folder_name, "class_info.jsonpickle")) as f:
+            class_vars = jsonpickle.decode(f.read())
             
         nnz = class_vars.pop("nnz")
         shape = tuple(class_vars.pop("shape"))
@@ -241,6 +257,7 @@ class SparseCollection:
         sparse_collection.shape = shape
         
         sparse_collection.metadata.load_from_file(os.path.join(folder_name, "metadata.p"))
+        sparse_collection.weighting_schema.load_from_file(os.path.join(folder_name, "weight_schema.jsonpickle"))
         
         sparse_collection.sparse_vecs = sparse_collection.backend.load_tensors_from_file(os.path.join(folder_name, "tensors.safetensors"))
         

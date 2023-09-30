@@ -5,7 +5,7 @@ from text2vec import BagOfWords
 import torch
 from collections import defaultdict
 from tqdm import tqdm
-from transformations import BM25Transform
+from weighting_model import BM25Transform
 import click
 import pyterrier  as pt
 import pandas as pd
@@ -57,7 +57,7 @@ def main(msmarco_folder, max_lines):
         return f"{title} {abstract}"
 
     with open(PATH_TO_MSMARCO) as f:
-        collection_iterator = map(get_title_abstract,f)
+        collection_iterator = enumerate(map(get_title_abstract,f))
         
         sparseCSR_collection = SparseCollectionCSR.from_text_iterator(collection_iterator,
                                                                         collection_maxsize=max_lines,
