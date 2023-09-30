@@ -9,7 +9,7 @@ from text2vec import BagOfWords
 import torch
 from collections import defaultdict
 from tqdm import tqdm
-from transformations import BM25Transform
+from weighting_model import BM25Transform
 import click
 import pyterrier  as pt
 import pandas as pd
