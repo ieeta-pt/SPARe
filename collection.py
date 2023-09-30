@@ -87,7 +87,10 @@ class SparseCollection:
             self.weighting_schema = transform_operator.get_weighting_schema()
         else:
             raise ValueError("Your current collection weighing schema or metadata is not compatible with the transformation asked.")
-            
+    
+    def get_sparce_matrix(self):
+        return self.backend.create_coo_matrix(*self.sparse_vecs, self.shape)
+    
     def _correct_transform_operator(self, transform_operator):
         return transform_operator.for_coo()
     
@@ -279,6 +282,9 @@ class SparseCollectionCSR(SparseCollection):
     
     def get_sparce_matrix_space(self):
         return get_csr_sparce_GB(self.shape, self.density, self.dtype, self.indices_dtype)
+    
+    def get_sparce_matrix(self):
+        return self.backend.create_csr_matrix(*self.sparse_vecs, self.shape)
     
     def _init_sparse_vecs(self, elements_expected):
         crow_indices = self.backend.create_zero_tensor((self.shape[0]+1,), self.indices_dtype)

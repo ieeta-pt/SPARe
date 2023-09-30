@@ -15,7 +15,6 @@ import pyterrier  as pt
 import pandas as pd
 import glob
 import re
-from mpipe import UnorderedWorker, UnorderedStage, Pipeline
 
 from multiprocessing import Queue
 

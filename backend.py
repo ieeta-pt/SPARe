@@ -80,4 +80,9 @@ class TorchBackend(AbstractBackend):
     def lookup_by_indices(self, tensor, dim, indices):
         return torch.index_select(tensor, dim, indices)
     
+    def create_csr_matrix(self, crow_indices, col_indices, values, dtype):
+        return torch.sparse_csr_tensor(crow_indices, col_indices, values, self.types_converter[dtype])
+    
+    def create_dense_tensor_from_bow(self, bow, vocab_size, dtype):
+        return torch.sparse_coo_tensor([list(bow.keys())], list(bow.values()), (vocab_size,), dtype=self.types_converter[dtype]).to_dense()   
     
