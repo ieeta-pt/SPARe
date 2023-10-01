@@ -76,7 +76,7 @@ class TorchBackend(AbstractBackend):
         dl = torch.utils.data.DataLoader(questions_dataset, 
                                             batch_size=len(self.devices), 
                                             pin_memory=True, 
-                                            num_workers=1)
+                                            num_workers=0)
         
         if len(self.devices)>1:
             
