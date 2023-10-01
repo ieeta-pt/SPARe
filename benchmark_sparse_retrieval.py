@@ -52,8 +52,8 @@ def main(dataset_folder):
     
     csr_matrix_gpu = csr_matrix_cpu.to("cuda")
     
-    with open(f"{dataset_folder}/selected_corpus_lm_fcm_STD2_L10000_gpt-neo-1.3B_BS_5_E13931.459746599197.jsonl") as f:
-    #with open("../syn-question-col-analysis/question_generation/gen_output/msmarco/selected_corpus_lm_fcm_STD2_L10000_gpt-neo-1.3B_BS_5_E13931.459746599197.jsonl") as f:
+    #with open(f"{dataset_folder}/selected_corpus_lm_fcm_STD2_L10000_gpt-neo-1.3B_BS_5_E13931.459746599197.jsonl") as f:
+    with open("../syn-question-col-analysis/question_generation/gen_output/msmarco/selected_corpus_lm_fcm_STD2_L10000_gpt-neo-1.3B_BS_5_E13931.459746599197.jsonl") as f:
         questions = [line for line in map(json.loads, f)]
     
     def text_to_dense_torch(text):

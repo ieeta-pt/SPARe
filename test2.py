@@ -48,8 +48,6 @@ def tokenizer(text):
 if __name__=="__main__":
     #mp.set_start_method("spawn")
     
-    
-    
     sparse_collection = SparseCollectionCSR.load_from_file("csr_msmarco_bm25_12_075_terrier")
 
     bow = BagOfWords(tokenizer, vocab_size)
