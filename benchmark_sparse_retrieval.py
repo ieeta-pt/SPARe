@@ -7,6 +7,7 @@ import torch
 import json
 import time
 from tqdm import tqdm
+from collection import SparseCollectionCSR
 
 @click.command()
 @click.argument("dataset_folder")
@@ -41,15 +42,9 @@ def main(dataset_folder):
 
     bow = BagOfWords(tokenizer, vocab_size)
     
-    tensors = {}
-    with safe_open(f"csr_msmarco_bm25_pyterrier.safetensors", framework="pt", device="cpu") as f:
-        for key in f.keys():
-            tensors[key] = f.get_tensor(key)
-        
-    tensors = [tensors["vec_0"], tensors["vec_1"], tensors["vec_2"]]
+    sparse_collection = SparseCollectionCSR.load_from_file("csr_msmarco_bm25_12_075_terrier")
 
-    csr_matrix_cpu = torch.sparse_csr_tensor(*tensors, (8841823, vocab_size))
-    
+    csr_matrix_cpu = sparse_collection.get_sparce_matrix()
     csr_matrix_gpu = csr_matrix_cpu.to("cuda")
     
     #with open(f"{dataset_folder}/selected_corpus_lm_fcm_STD2_L10000_gpt-neo-1.3B_BS_5_E13931.459746599197.jsonl") as f:
