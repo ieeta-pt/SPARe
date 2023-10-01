@@ -15,8 +15,6 @@ import pandas as pd
 
 import torch.nn as nn
 
-from utils import idf_weighting
-
 pt.init()
 
 indexref = pt.IndexRef.of("../syn-question-col-analysis/datasets/msmarco/terrier_index/")
@@ -52,12 +50,12 @@ if __name__=="__main__":
     
     
     
-    sparse_collection = SparseCollectionCSR.load_from_file("csr_msmarco")
+    sparse_collection = SparseCollectionCSR.load_from_file("csr_msmarco_bm25_12_075_terrier")
 
     bow = BagOfWords(tokenizer, vocab_size)
 
     # add the option if no weighitngmodel then use the collection weighting model
-    sparse_retriver = SparseRetriever(sparse_collection, bow, BM25WeightingModel(k1=1.2, b=0.75, idf_weighting=idf_weighting))
+    sparse_retriver = SparseRetriever(sparse_collection, bow, BM25WeightingModel())
 
     with open("../syn-question-col-analysis/question_generation/gen_output/msmarco/selected_corpus_lm_fcm_STD2_L10000_gpt-neo-1.3B_BS_5_E13931.459746599197.jsonl") as f:
         questions = [line["question"] for line in map(json.loads, f)]
