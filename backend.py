@@ -4,6 +4,8 @@ from collections import defaultdict
 import torch
 from safetensors.torch import save_file
 from safetensors import safe_open
+from tqdm import tqdm
+
 
 class Singleton(type):
     _instances = {}
@@ -86,3 +88,83 @@ class TorchBackend(AbstractBackend):
     def create_dense_tensor_from_bow(self, bow, vocab_size, dtype):
         return torch.sparse_coo_tensor([list(bow.keys())], list(bow.values()), (vocab_size,), dtype=self.types_converter[dtype]).to_dense()   
     
+    def accelerate(self, tensor):
+        return tensor.to("cuda:0")
+    
+    def fused_retrieve(self, questions_list, question_func, collection, top_k):
+        
+        devices = list(range(torch.cuda.device_count()))
+        sparse_model= SparseRetrievalModel(collection, top_k=top_k).to("cuda")
+        questions_dataset = QuestionDataset(questions_list, question_func, collection.shape[-1])
+        
+        dl = torch.utils.data.DataLoader(questions_dataset, 
+                                            batch_size=len(devices), 
+                                            pin_memory=True, 
+                                            num_workers=1)
+        
+        if len(devices)>1:
+            
+            replicas = torch.nn.parallel.replicate(sparse_model, devices)
+            results = {i:{"indices":[],"values":[]} for i in devices}
+
+            for questions in tqdm(dl):
+                
+                inputs = torch.nn.parallel.scatter(questions, devices)        
+                r = torch.nn.parallel.parallel_apply(replicas[:len(inputs)], inputs)
+            #results.append(r)
+                for i, out in enumerate(r):
+                    results[i]["indices"].append(out.indices)
+                    results[i]["values"].append(out.values)
+            
+            indices_cpu = []
+            values_cpu = []
+
+            for d_id, out in results.items():
+                indices_cpu.append(torch.stack(out["indices"]).cpu())
+                values_cpu.append(torch.stack(out["values"]).cpu())
+
+        else:
+            indices = []
+            values = []
+            for question in tqdm(dl):
+                r = sparse_model(question.to("cuda"))
+                indices.append(r.indices)
+                values.append(r.values)
+                
+            indices_cpu = torch.stack(indices).cpu()
+            values_cpu = torch.stack(indices).cpu()
+            
+        return indices_cpu, values_cpu
+            
+class SparseRetrievalModel(torch.nn.Module):
+    def __init__(self, sparse_collection, top_k = 10):
+        super().__init__()
+        #self.shape = sparse_collection.sparse_vecs, sparse_collection.shape
+        self.crow = torch.nn.parameter.Parameter(sparse_collection.sparse_vecs[0], requires_grad=False)
+        self.indice = torch.nn.parameter.Parameter(sparse_collection.sparse_vecs[1], requires_grad=False)
+        self.values = torch.nn.parameter.Parameter(sparse_collection.sparse_vecs[2], requires_grad=False)
+        self.collection_matrix = None#torch.sparse_csr_tensor(self.crow, self.indice, self.values, sparse_collection.shape)
+        self.shape = sparse_collection.shape
+        self.top_k = top_k
+        
+    def forward(self, x):
+        x= x.squeeze(0)
+        #print(x.shape)
+        collection_matrix = torch.sparse_csr_tensor(self.crow, self.indice, self.values, self.shape)
+    
+        return torch.topk(collection_matrix @ x, k=self.top_k, dim=0)
+        #return x
+
+
+class QuestionDataset(torch.utils.data.Dataset):
+    def __init__(self, questions, bow, vocab_size):
+        self.questions = questions#[:10000]
+        self.bow = bow
+        self.vocab_size = vocab_size
+
+    def __len__(self):
+        return len(self.questions)
+
+    def __getitem__(self, idx):
+        b = self.bow(self.questions[idx])
+        return torch.sparse_coo_tensor([list(b.keys())], list(b.values()), (self.vocab_size,), dtype=torch.float32).to_dense()

@@ -74,7 +74,7 @@ class BM25WeightingModel:
     
     def transform_query(self, query):
         # apply the weighting scheme to the query bow if its applicable
-        pass
+        return query
     
     def transform_collection(self, collection, inplace=True):
         
