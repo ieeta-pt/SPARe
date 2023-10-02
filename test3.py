@@ -56,12 +56,14 @@ if __name__=="__main__":
     sparse_retriver = SparseRetriever(sparse_collection, lambda x:x, BM25WeightingModel())
 
     with open("../syn-question-col-analysis/question_generation/gen_output/msmarco/selected_corpus_lm_fcm_STD2_L10000_gpt-neo-1.3B_BS_5_E13931.459746599197.jsonl") as f:
-        questions = [bow(line["question"]) for line in map(json.loads, f)]
-        
-    questions = questions[:2000]
+        questions = [line["question"] for line in map(json.loads, f)]
+    
+    s_bow = time.time()
+    questions = [bow(q) for q in questions]
+    e_bow = time.time()
     
     s = time.time()
     sparse_retriver.retrieve(questions)
     e = time.time()
     
-    print("Total time", (e-s), "QPS", len(questions)/(e-s))
+    print("Total time", (e-s), "QPS", len(questions)/(e-s), "Bow time:", (e_bow-s_bow))
