@@ -73,18 +73,27 @@ def main(dataset_folder):
         results = []
         total_time = 0
         total_time_gpu = 0
-        for question in questions[:1000]:
+        total_transfer = 0
+        total_bow = 0
+        _questions = questions[:2000]#[bow(x["question"]) for x in questions[:2000]]
+        
+        for question in tqdm(_questions):
             start_bow = time.time()
             b = bow(question["question"])
             start_t = time.time()
-            query_gpu = torch.sparse_coo_tensor([list(b.keys())], list(b.values()), (vocab_size,), dtype=torch.float32).to_dense().to("cuda")
+            indices = torch.tensor([list(b.keys())], dtype=torch.int64).to("cuda")
+            values = torch.tensor(list(b.values())).to("cuda")
+            query_gpu = torch.sparse_coo_tensor(indices, values, (vocab_size,), dtype=torch.float32).to_dense()
+            end_transfer = time.time()
             r = torch.topk(csr_matrix_gpu @ query_gpu, k=at, dim=0).indices
             results.append(r)
             end_t = time.time()
+            total_bow += (start_t-start_bow)
+            total_transfer += (end_transfer-start_t)
             total_time_gpu+=(end_t - start_t)
             total_time+=(end_t - start_bow)
 
-        print(f"at: {at}", 1000/total_time, "| only GPU", 1000/total_time_gpu)
+        print(f"at: {at}", len(_questions)/total_time, "| only GPU", len(_questions)/total_time_gpu, "| to GPU", total_transfer/len(_questions), "| bow", total_bow/len(_questions), "| gpu", total_time_gpu/len(_questions))
 
     
 

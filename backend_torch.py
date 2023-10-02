@@ -3,6 +3,7 @@ import torch
 from safetensors.torch import save_file
 from safetensors import safe_open
 from tqdm import tqdm
+import time
 
 class TorchBackend(AbstractBackend):
     
@@ -67,9 +68,57 @@ class TorchBackend(AbstractBackend):
         return tensor.to(self.devices[0])
     
     def fused_retrieve(self, questions_list, question_func, collection, top_k, collect_at=5000):
-        # TODO use the collect_at to flush the retrived documents to CPU
+         
+        if len(self.devices)>1:
+            
+            return self._distributed_retrieval(questions_list, question_func, collection, top_k, collect_at=collect_at)
+
+        else:
+            return self._single_retrieval(questions_list, question_func, collection, top_k, collect_at=collect_at)
         
-        # TODO verify if the Model is using CSR matrix... COO is to slow not worth it to run
+        #converted_indices = []
+        #values_list = []
+        #for i in range(indices_cpu.shape[0]):
+        #    q_indices = [collection.metadata.index2docID[idx] for idx in indices[i].tolist()]
+        #    converted_indices.append(q_indices)
+        
+
+    
+    
+    def _distributed_retrieval(self, questions_list, question_func, collection, top_k, collect_at):
+        
+        sparse_model= CSRSparseRetrievalDistributedModel(collection, top_k=top_k).to(self.devices[0])
+        questions_dataset = DistributedQuestionDataset(questions_list, question_func, collection.shape[-1])
+        
+        dl = torch.utils.data.DataLoader(questions_dataset, 
+                                         batch_size=len(self.devices), 
+                                         collate_fn=distributed_collate_fn, 
+                                         pin_memory=True, 
+                                         num_workers=0)
+        
+        replicas = torch.nn.parallel.replicate(sparse_model, self.devices)
+        results = {i:{"indices":[],"values":[]} for i,_ in enumerate(self.devices)}
+
+        for questions in tqdm(dl):
+
+            inputs = torch.nn.parallel.scatter(questions, self.devices)
+            r = torch.nn.parallel.parallel_apply(replicas[:len(inputs)], inputs)
+        #results.append(r)
+            for i, out in enumerate(r):
+                results[i]["indices"].append(out.indices)
+                results[i]["values"].append(out.values)
+        
+        indices_cpu = []
+        values_cpu = []
+
+        for d_id, out in results.items():
+            indices_cpu.append(torch.stack(out["indices"]).cpu())
+            values_cpu.append(torch.stack(out["values"]).cpu())
+            
+        return indices_cpu, values_cpu
+        
+    def _single_retrieval(self, questions_list, question_func, collection, top_k, collect_at):
+        
         sparse_model= CSRSparseRetrievalModel(collection, top_k=top_k).to(self.devices[0])
         questions_dataset = QuestionDataset(questions_list, question_func, collection.shape[-1])
         
@@ -78,43 +127,15 @@ class TorchBackend(AbstractBackend):
                                             pin_memory=True, 
                                             num_workers=0)
         
-        if len(self.devices)>1:
-            
-            replicas = torch.nn.parallel.replicate(sparse_model, self.devices)
-            results = {i:{"indices":[],"values":[]} for i,_ in enumerate(self.devices)}
-
-            for questions in tqdm(dl):
-                
-                inputs = torch.nn.parallel.scatter(questions, self.devices)        
-                r = torch.nn.parallel.parallel_apply(replicas[:len(inputs)], inputs)
-            #results.append(r)
-                for i, out in enumerate(r):
-                    results[i]["indices"].append(out.indices)
-                    results[i]["values"].append(out.values)
-            
-            indices_cpu = []
-            values_cpu = []
-
-            for d_id, out in results.items():
-                indices_cpu.append(torch.stack(out["indices"]).cpu())
-                values_cpu.append(torch.stack(out["values"]).cpu())
-
-        else:
-            indices = []
-            values = []
-            for question in tqdm(dl):
-                r = sparse_model(question.to(self.devices[0]))
-                indices.append(r.indices)
-                values.append(r.values)
-                
-            indices_cpu = torch.stack(indices).cpu()
-            values_cpu = torch.stack(values).cpu()
+        indices = []
+        values = []
+        for question in tqdm(dl):
+            r = sparse_model(*[x.to(self.devices[0]) for x in question])
+            indices.append(r.indices)
+            values.append(r.values)
         
-        #converted_indices = []
-        #values_list = []
-        #for i in range(indices_cpu.shape[0]):
-        #    q_indices = [collection.metadata.index2docID[idx] for idx in indices[i].tolist()]
-        #    converted_indices.append(q_indices)
+        indices_cpu = torch.stack(indices).cpu()
+        values_cpu = torch.stack(values).cpu()
         
         return indices_cpu, values_cpu
             
@@ -129,15 +150,26 @@ class CSRSparseRetrievalModel(torch.nn.Module):
         self.shape = sparse_collection.shape
         self.top_k = top_k
         
-    def forward(self, x):
-        x= x.squeeze(0)
-        x = x.to_dense()
+    def forward(self, indices, values):
+
+        query = torch.sparse_coo_tensor(indices, values.squeeze(0), (self.shape[-1],), dtype=torch.float32).to_dense()
+
         #print(x.shape)
         collection_matrix = torch.sparse_csr_tensor(self.crow, self.indice, self.values, self.shape)
     
-        return torch.topk(collection_matrix @ x, k=self.top_k, dim=0)
+        return torch.topk(collection_matrix @ query, k=self.top_k, dim=0)
         #return x
 
+class CSRSparseRetrievalDistributedModel(CSRSparseRetrievalModel):
+        
+    def forward(self, indices, values, size):
+        
+        query = torch.sparse_coo_tensor(indices[0, :size].unsqueeze(0), values[0,:size], (self.shape[-1],), dtype=torch.float32).to_dense()
+        #print(x.shape)
+        collection_matrix = torch.sparse_csr_tensor(self.crow, self.indice, self.values, self.shape)
+    
+        return torch.topk(collection_matrix @ query, k=self.top_k, dim=0)
+        #return x
 
 class QuestionDataset(torch.utils.data.Dataset):
     def __init__(self, questions, bow, vocab_size):
@@ -150,4 +182,28 @@ class QuestionDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         b = self.bow(self.questions[idx])
-        return torch.sparse_coo_tensor([list(b.keys())], list(b.values()), (self.vocab_size,), dtype=torch.float32).to_dense()
+        indices = torch.tensor(list(b.keys()))
+        values = torch.tensor(list(b.values()))
+        
+        return indices, values#{"indices": indices, "values": values}
+    
+    
+class DistributedQuestionDataset(QuestionDataset):
+
+    def __getitem__(self, idx):
+        b = self.bow(self.questions[idx])
+        indices = list(b.keys())
+        values = list(b.values())
+        
+        return indices, values
+    
+def distributed_collate_fn(data):
+    max_len = max([len(x[0]) for x in data])
+    indices = []
+    values = []
+    sizes = []
+    for x in data:
+        sizes.append(len(x[0]))
+        indices.append(x[0]+[0]*(max_len-len(x[0])))
+        values.append(x[1]+[0]*(max_len-len(x[1])))
+    return torch.tensor(indices), torch.tensor(values), torch.tensor(sizes)

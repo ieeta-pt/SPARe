@@ -53,10 +53,13 @@ if __name__=="__main__":
     bow = BagOfWords(tokenizer, vocab_size)
 
     # add the option if no weighitngmodel then use the collection weighting model
-    sparse_retriver = SparseRetriever(sparse_collection, bow, BM25WeightingModel())
+    sparse_retriver = SparseRetriever(sparse_collection, lambda x:x, BM25WeightingModel())
 
     with open("../syn-question-col-analysis/question_generation/gen_output/msmarco/selected_corpus_lm_fcm_STD2_L10000_gpt-neo-1.3B_BS_5_E13931.459746599197.jsonl") as f:
-        questions = [line["question"] for line in map(json.loads, f)]
+        questions = [bow(line["question"]) for line in map(json.loads, f)]
+        
+    questions = questions[:2000]
+    
     s = time.time()
     sparse_retriver.retrieve(questions)
     e = time.time()
