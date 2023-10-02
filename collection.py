@@ -36,7 +36,7 @@ class SparseCollection:
             self.vec_dim = vec_dim
         
         if backend=="torch":
-            from backend import TorchBackend
+            from backend_torch import TorchBackend
             self.backend = TorchBackend()
         else:
             RuntimeError("Only torch backend is currently supported")
@@ -284,7 +284,7 @@ class SparseCollectionCSR(SparseCollection):
         return get_csr_sparce_GB(self.shape, self.density, self.dtype, self.indices_dtype)
     
     def get_sparce_matrix(self):
-        return self.backend.create_csr_matrix(*self.sparse_vecs, self.shape)
+        return self.backend.create_csr_matrix(*self.sparse_vecs, self.shape, self.dtype)
     
     def _init_sparse_vecs(self, elements_expected):
         crow_indices = self.backend.create_zero_tensor((self.shape[0]+1,), self.indices_dtype)
