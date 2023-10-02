@@ -5,23 +5,33 @@ import json
 import shutil
 import click
 
+#"msmarco",
+#"nq",
+#"hotpotqa",
+#"climate-fever",
+#"arguana",
+#"quora",
+#"scidocs",
+#"fever",
+
 datasets = ["arguana", 
-            "climate-fever",
+            #"climate-fever",
             #"cqadupstack",
-            "dbpedia-entity",
-            "fever",
-            "fiqa",
-            "germanquad",
+            #"dbpedia-entity",
+            #"fever",
+            #"fiqa",
+            #"germanquad",
             "hotpotqa",
             "msmarco",
-            "nfcorpus",
+            #"nfcorpus",
             "nq",
             "quora",
             "scidocs",
-            "scifact",
-            "trec-covid",
-            "vihealthqa",
-            "webis-touche2020"]
+            #"scifact",
+            #"trec-covid",
+            #"vihealthqa",
+            #"webis-touche2020"
+            ]
 
 def build_corpus_and_rels(data_path, dev_split, dataset_path):
     print(dataset_path, dev_split)
