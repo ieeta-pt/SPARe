@@ -48,17 +48,25 @@ def tokenizer(text):
 if __name__=="__main__":
     #mp.set_start_method("spawn")
     
-    sparse_collection = SparseCollectionCSR.load_from_file("csr_msmarco_bm25_12_075_terrier")
+    # load collection data and metadata from a previously created folder
+    sparse_collection = SparseCollectionCSR.load_from_file("csr_msmarco_bm25_12_075_terrier") # cpu
 
+    # creates the bow function to convert text into vec
     bow = BagOfWords(tokenizer, vocab_size)
 
-    # add the option if no weighitngmodel then use the collection weighting model
+    # add the option if no WeightingModel then use the collection weighting model
+    # no k1 and b is specified bc the collection was already saved with k1 1.2 and b 0.75
     sparse_retriver = SparseRetriever(sparse_collection, bow, BM25WeightingModel())
 
+    # load a large number of questions
     with open("../syn-question-col-analysis/question_generation/gen_output/msmarco/selected_corpus_lm_fcm_STD2_L10000_gpt-neo-1.3B_BS_5_E13931.459746599197.jsonl") as f:
         questions = [line["question"] for line in map(json.loads, f)]
+    
+    questions = questions[:10000]
+         
     s = time.time()
-    sparse_retriver.retrieve(questions)
+    # Retrieve by default utilizes the maximum amount of resources available
+    sparse_retriver.retrieve(questions) # TODO load directly to the device
     e = time.time()
     
-    print("Total time", (e-s), "QPS", len(questions)/(e-s))
+    print("Total retrieve time", (e-s), "QPS", len(questions)/(e-s))

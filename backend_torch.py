@@ -99,15 +99,18 @@ class TorchBackend(AbstractBackend):
         replicas = torch.nn.parallel.replicate(sparse_model, self.devices)
         results = {i:{"indices":[],"values":[]} for i,_ in enumerate(self.devices)}
 
-        for questions in tqdm(dl):
+        with tqdm(total=len(questions_dataset)) as pbar:
+            for questions in dl:
 
-            inputs = torch.nn.parallel.scatter(questions, self.devices)
-            r = torch.nn.parallel.parallel_apply(replicas[:len(inputs)], inputs)
-        #results.append(r)
-            for i, out in enumerate(r):
-                results[i]["indices"].append(out.indices)
-                results[i]["values"].append(out.values)
-        
+                inputs = torch.nn.parallel.scatter(questions, self.devices)
+                r = torch.nn.parallel.parallel_apply(replicas[:len(inputs)], inputs)
+            #results.append(r)
+                for i, out in enumerate(r):
+                    results[i]["indices"].append(out.indices)
+                    results[i]["values"].append(out.values)
+            
+                pbar.update(len(inputs))
+            
         indices_cpu = []
         values_cpu = []
 
