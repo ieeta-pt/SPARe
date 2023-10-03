@@ -67,14 +67,14 @@ class TorchBackend(AbstractBackend):
     def accelerate(self, tensor):
         return tensor.to(self.devices[0])
     
-    def fused_retrieve(self, questions_list, question_func, collection, top_k, collect_at=5000):
+    def fused_retrieve(self, questions_list, question_func, collection, top_k, collect_at=5000, profiling=False):
          
         if len(self.devices)>1:
             
-            return self._distributed_retrieval(questions_list, question_func, collection, top_k, collect_at=collect_at)
+            return self._distributed_retrieval(questions_list, question_func, collection, top_k, collect_at=collect_at, profiling=profiling)
 
         else:
-            return self._single_retrieval(questions_list, question_func, collection, top_k, collect_at=collect_at)
+            return self._single_retrieval(questions_list, question_func, collection, top_k, collect_at=collect_at, profiling=profiling)
         
         #converted_indices = []
         #values_list = []
@@ -85,7 +85,7 @@ class TorchBackend(AbstractBackend):
 
     
     
-    def _distributed_retrieval(self, questions_list, question_func, collection, top_k, collect_at):
+    def _distributed_retrieval(self, questions_list, question_func, collection, top_k, collect_at, profiling):
         
         sparse_model= CSRSparseRetrievalDistributedModel(collection, top_k=top_k).to(self.devices[0])
         questions_dataset = DistributedQuestionDataset(questions_list, question_func, collection.shape[-1])
@@ -120,7 +120,7 @@ class TorchBackend(AbstractBackend):
             
         return indices_cpu, values_cpu
         
-    def _single_retrieval(self, questions_list, question_func, collection, top_k, collect_at):
+    def _single_retrieval(self, questions_list, question_func, collection, top_k, collect_at, profiling):
         
         sparse_model= CSRSparseRetrievalModel(collection, top_k=top_k).to(self.devices[0])
         questions_dataset = QuestionDataset(questions_list, question_func, collection.shape[-1])

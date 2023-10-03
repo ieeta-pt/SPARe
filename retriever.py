@@ -31,7 +31,7 @@ class SparseRetriever:
             #out = self.backend.
         
     
-    def retrieve(self, questions_list, top_k=1000, collect_at=5000):
+    def retrieve(self, questions_list, top_k=1000, collect_at=5000, profiling=False):
         
         def query_transform(query):
             return self.weighting_model.transform_query(self.bow(query)
@@ -40,7 +40,8 @@ class SparseRetriever:
                                            query_transform,
                                            self.collection, 
                                            top_k,
-                                           collect_at=collect_at)
+                                           collect_at=collect_at,
+                                           profiling=profiling)
   
             
             
