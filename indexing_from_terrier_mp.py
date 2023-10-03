@@ -15,6 +15,8 @@ import pyterrier  as pt
 import pandas as pd
 import glob
 import re
+import os
+from utils import terrier_idf
 
 from multiprocessing import Queue
 
@@ -39,7 +41,7 @@ def tokenizerworker(q_in: Queue, q_out: Queue, msmarco_folder, identifier):
     if not pt.started():
         pt.init()
     #print("Init Tokenizer 3")
-    indexref = pt.IndexRef.of(f"{msmarco_folder}/terrier_index")
+    indexref = pt.IndexRef.of(f"./{msmarco_folder}/terrier_index")
     index = pt.IndexFactory.of(indexref)
     #print("Init Tokenizer 4")
     def tp_func():
@@ -87,16 +89,16 @@ def tokenizerworker(q_in: Queue, q_out: Queue, msmarco_folder, identifier):
 
     
 @click.command()
-@click.argument("msmarco_folder")
+@click.argument("dataset_folder")
 @click.option("--process", default=8)
 @click.option("--max_lines", default=-1)
-def main(msmarco_folder, process, max_lines):
+def main(dataset_folder, process, max_lines):
     
-    PATH_TO_MSMARCO = list(glob.glob(f"{msmarco_folder}/corpus*"))[0]
+    PATH_TO_MSMARCO = list(glob.glob(f"{dataset_folder}/corpus*"))[0]
     if not pt.started():
         pt.init()
 
-    indexref = pt.IndexRef.of(f"{msmarco_folder}/terrier_index")
+    indexref = pt.IndexRef.of(f"./{dataset_folder}/terrier_index")
     index = pt.IndexFactory.of(indexref)
 
     vocab_size = len(index.getLexicon())
@@ -115,7 +117,7 @@ def main(msmarco_folder, process, max_lines):
                                         daemon=True)
     
     tokenizer_processes = [mp.Process(target=tokenizerworker, 
-                                        args=(reader_queue, tokenizer_queue, msmarco_folder, i), 
+                                        args=(reader_queue, tokenizer_queue, dataset_folder, i), 
                                         daemon=True) for i in range(process)]
     reader_process.start()
     
@@ -148,11 +150,11 @@ def main(msmarco_folder, process, max_lines):
                                                                 indices_dtype=TYPE.int32,
                                                                 backend="torch") 
     #print("loop_over")
-    sparseCSR_collection.save_to_file(f"csr_msmarco")
+    #sparseCSR_collection.save_to_file(f"csr")
 
-    sparseCSR_collection.transform(BM25Transform(k1=1.2, b=0.75))
+    sparseCSR_collection.transform(BM25Transform(k1=1.2, b=0.75, idf_weighting=terrier_idf))
 
-    sparseCSR_collection.save_to_file(f"csr_msmarco_bm25_12_075")
+    sparseCSR_collection.save_to_file(os.path.join(dataset_folder,f"csr_bm25_12_075"))
     
     print("reader_process, join")
     reader_process.join()
