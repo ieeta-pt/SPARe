@@ -8,7 +8,7 @@ if not pt.started():
     pt.init()
 
 pt.set_property("lowercase","true")
-pt.set_property("max.term.length", "1000")
+pt.set_property("max.term.length", "150")
 
 @click.command()
 @click.argument("dataset_folder")
