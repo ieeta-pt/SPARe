@@ -99,11 +99,16 @@ class BM25Transform:
         self.b = b
         self.idf_weighting=idf_weighting
         
-    def __call__(self, *sparce_vecs, metadata, dtype, backend) -> Any:
-        self.convert(*sparce_vecs, metadata, dtype, backend)
+    def __call__(self, collection) -> Any:
+        self.convert(collection)
     
-    def convert(self, *args, **kwargs):
-        raise RuntimeError
+    def convert(self, collection):
+        self._convert(collection)
+        # update the weighing schema.
+        collection.weighting_schema = self.get_weighting_schema()
+        
+    def _convert(self, collection):
+        raise RuntimeError("Implement _convert function")
     
     def get_weighting_schema(self):
         return BM25WeightingSchema(k1=self.k1, b=self.b, idf_weighting=self.idf_weighting)
@@ -134,7 +139,13 @@ class BM25TransformForCOO(BM25Transform):
         
         return k1_plus_one, d_partial_constant1, d_partial_constant2, idf
         
-    def convert(self, indices, values, shape, nnz, metadata, dtype, backend):
+    def _convert(self, indices, values, shape, nnz, metadata, dtype, backend):
+        indices, values = collection.sparce_vecs
+        shape = collection.shape
+        nnz = collection.nnz
+        metadata = collection.metadata
+        dtype = collection.dtype
+        backend = collection.backend
         
         k1_plus_one, d_partial_constant1, d_partial_constant2, idf = self._precomputations(metadata)
         
@@ -150,7 +161,13 @@ class BM25TransformForCOO(BM25Transform):
         
 class BM25TransformForCSR(BM25TransformForCOO):
     
-    def convert(self, crow_indices, col_indices, values, shape, nnz, metadata, dtype, backend):
+    def _convert(self, collection):
+        crow_indices, col_indices, values = collection.sparce_vecs
+        shape = collection.shape
+        nnz = collection.nnz
+        metadata = collection.metadata
+        dtype = collection.dtype
+        backend = collection.backend
         
         k1_plus_one, d_partial_constant1, d_partial_constant2, idf = self._precomputations(metadata)
         

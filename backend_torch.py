@@ -67,8 +67,12 @@ class TorchBackend(AbstractBackend):
     def accelerate(self, tensor):
         return tensor.to(self.devices[0])
     
+    def convert_dtype(self, tensor, dtype):
+        return tensor.type(self.types_converter[dtype])
+    
     def fused_retrieve(self, questions_list, question_func, collection, top_k, collect_at=5000, profiling=False):
-         
+        
+        top_k = min(top_k, collection.shape[0])
         if len(self.devices)>1:
             
             return self._distributed_retrieval(questions_list, question_func, collection, top_k, collect_at=collect_at, profiling=profiling)
@@ -98,7 +102,8 @@ class TorchBackend(AbstractBackend):
         
         replicas = torch.nn.parallel.replicate(sparse_model, self.devices)
         results = {i:{"indices":[],"values":[]} for i,_ in enumerate(self.devices)}
-
+        
+        start_retrieval_time = time.time()
         with tqdm(total=len(questions_dataset)) as pbar:
             for questions in dl:
 
@@ -110,7 +115,10 @@ class TorchBackend(AbstractBackend):
                     results[i]["values"].append(out.values)
             
                 pbar.update(len(inputs))
-            
+        end_retrieval_time = time.time()
+        print("Retrieval time:", end_retrieval_time-start_retrieval_time, "QPS", len(questions_dataset)/(end_retrieval_time-start_retrieval_time))
+        
+        mem_t_s = time.time()
         indices_cpu = []
         values_cpu = []
 
@@ -118,7 +126,13 @@ class TorchBackend(AbstractBackend):
             indices_cpu.append(torch.stack(out["indices"]).cpu())
             values_cpu.append(torch.stack(out["values"]).cpu())
             
-        return indices_cpu, values_cpu
+        men_t_e = time.time()
+        print("Mem transference time:", men_t_e-mem_t_s)
+            
+        if profiling:
+            return (indices_cpu, values_cpu), (len(questions_dataset)/(end_retrieval_time-start_retrieval_time), men_t_e-mem_t_s)
+        else:
+            return indices_cpu, values_cpu
         
     def _single_retrieval(self, questions_list, question_func, collection, top_k, collect_at, profiling):
         
@@ -130,17 +144,27 @@ class TorchBackend(AbstractBackend):
                                             pin_memory=True, 
                                             num_workers=0)
         
+        start_retrieval_time = time.time()
         indices = []
         values = []
         for question in tqdm(dl):
             r = sparse_model(*[x.to(self.devices[0]) for x in question])
             indices.append(r.indices)
             values.append(r.values)
+        end_retrieval_time = time.time()
+        print("Retrieval time:", end_retrieval_time-start_retrieval_time, "QPS", len(questions_dataset)/(end_retrieval_time-start_retrieval_time))
         
+        mem_t_s = time.time()
         indices_cpu = torch.stack(indices).cpu()
         values_cpu = torch.stack(values).cpu()
         
-        return indices_cpu, values_cpu
+        men_t_e = time.time()
+        print("Mem transference time:", men_t_e-mem_t_s)
+        
+        if profiling:
+            return (indices_cpu, values_cpu), (len(questions_dataset)/(end_retrieval_time-start_retrieval_time), men_t_e-mem_t_s)
+        else:
+            return indices_cpu, values_cpu
             
 class CSRSparseRetrievalModel(torch.nn.Module):
     def __init__(self, sparse_collection, top_k = 10):
@@ -154,11 +178,10 @@ class CSRSparseRetrievalModel(torch.nn.Module):
         self.top_k = top_k
         
     def forward(self, indices, values):
-
-        query = torch.sparse_coo_tensor(indices, values.squeeze(0), (self.shape[-1],), dtype=torch.float32).to_dense()
+        query = torch.sparse_coo_tensor(indices, values.squeeze(0), (self.shape[-1],), dtype=self.values.dtype).to_dense()
 
         #print(x.shape)
-        collection_matrix = torch.sparse_csr_tensor(self.crow, self.indice, self.values, self.shape)
+        collection_matrix = torch.sparse_csr_tensor(self.crow, self.indice, self.values, self.shape, dtype=self.values.dtype)
     
         return torch.topk(collection_matrix @ query, k=self.top_k, dim=0)
         #return x
@@ -167,9 +190,9 @@ class CSRSparseRetrievalDistributedModel(CSRSparseRetrievalModel):
         
     def forward(self, indices, values, size):
         
-        query = torch.sparse_coo_tensor(indices[0, :size].unsqueeze(0), values[0,:size], (self.shape[-1],), dtype=torch.float32).to_dense()
+        query = torch.sparse_coo_tensor(indices[0, :size].unsqueeze(0), values[0,:size], (self.shape[-1],), dtype=self.values.dtype).to_dense()
         #print(x.shape)
-        collection_matrix = torch.sparse_csr_tensor(self.crow, self.indice, self.values, self.shape)
+        collection_matrix = torch.sparse_csr_tensor(self.crow, self.indice, self.values, self.shape, dtype=self.values.dtype)
     
         return torch.topk(collection_matrix @ query, k=self.top_k, dim=0)
         #return x
@@ -186,6 +209,7 @@ class QuestionDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         b = self.bow(self.questions[idx])
         indices = torch.tensor(list(b.keys()))
+        # TODO fix I need to use the same dtype of the collection
         values = torch.tensor(list(b.values()))
         
         return indices, values#{"indices": indices, "values": values}
