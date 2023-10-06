@@ -82,9 +82,7 @@ class SparseCollection:
     
     def transform(self, transform_operator):
         if transform_operator.is_compatible(self):
-            self._correct_transform_operator(transform_operator).convert(*self.sparse_vecs, self.shape, self.nnz, self.metadata, self.dtype, self.backend)
-            # update the weighing schema.
-            self.weighting_schema = transform_operator.get_weighting_schema()
+            self._correct_transform_operator(transform_operator).convert(self)
         else:
             raise ValueError("Your current collection weighing schema or metadata is not compatible with the transformation asked.")
     
