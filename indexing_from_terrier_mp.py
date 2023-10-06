@@ -22,14 +22,14 @@ from multiprocessing import Queue
 
 def readerworker(q_out: Queue, path_to_msmarco, max_lines):
     
-    def get_title_abstract(string):
+    def get_id_contents(string):
         data = json.loads(string)
-        title, abstract = data["title"], data["abstract"]
-        return f"{title} {abstract}"
+        #text = data["id"], data["contents"]
+        return data["id"], data["contents"]
 
     with open(path_to_msmarco) as f:
-        for i, article_text in enumerate(map(get_title_abstract,f)):
-            q_out.put((i, article_text))
+        for i, article_data in enumerate(map(get_id_contents,f)):
+            q_out.put(article_data)
             if i>=max_lines:
                 break
             
@@ -94,7 +94,7 @@ def tokenizerworker(q_in: Queue, q_out: Queue, msmarco_folder, identifier):
 @click.option("--max_lines", default=-1)
 def main(dataset_folder, process, max_lines):
     
-    PATH_TO_MSMARCO = list(glob.glob(f"{dataset_folder}/corpus*"))[0]
+    PATH_TO_MSMARCO = list(glob.glob(f"{dataset_folder}/collection/corpus*"))[0]
     if not pt.started():
         pt.init()
 
@@ -154,7 +154,7 @@ def main(dataset_folder, process, max_lines):
 
     sparseCSR_collection.transform(BM25Transform(k1=1.2, b=0.75, idf_weighting=terrier_idf))
 
-    sparseCSR_collection.save_to_file(os.path.join(dataset_folder,f"csr_bm25_12_075"))
+    sparseCSR_collection.save_to_file(os.path.join(dataset_folder,f"csr_terrier_bm25_12_075"))
     
     print("reader_process, join")
     reader_process.join()

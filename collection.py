@@ -217,6 +217,7 @@ class SparseCollection:
 
         dense_size = self.vec_dim*len(sampled_bow_list)
         density = sum([sum(bow.values()) for _, bow in sampled_bow_list])/dense_size
+        density += density*0.05
         shape = (self.collection_maxsize, self.vec_dim)
 
         return shape, density

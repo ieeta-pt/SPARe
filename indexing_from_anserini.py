@@ -7,44 +7,35 @@ from collections import defaultdict
 from tqdm import tqdm
 from weighting_model import BM25Transform
 import click
-import pyterrier  as pt
-import pandas as pd
+from pyserini.index.lucene import IndexReader
+from pyserini.analysis import Analyzer, get_lucene_analyzer
+
 import glob
 import re
-
+import os
 @click.command()
 @click.argument("msmarco_folder")
 @click.option("--max_lines", default=-1)
 def main(msmarco_folder, max_lines):
-    pt.init()
+    
+    index_reader = IndexReader(f"{msmarco_folder}/anserini_index")
 
-    indexref = pt.IndexRef.of(f"{msmarco_folder}/terrier_index")
-    index = pt.IndexFactory.of(indexref)
-
-    def tp_func():
-        stops = pt.autoclass("org.terrier.terms.Stopwords")(None)
-        stemmer = pt.autoclass("org.terrier.terms.PorterStemmer")(None)
-        def _apply_func(row):
-            words = row["query"].split(" ") # this is safe following pt.rewrite.tokenise()
-            words = [stemmer.stem(w) for w in words if not stops.isStopword(w) ]
-            return words#" ".join(words)
-        return _apply_func 
-
-    pipe = pt.rewrite.tokenise() >> pt.apply.query(tp_func())
-    token2id = {word.getKey():i for i,word in enumerate(index.getLexicon()) }
-
-    vocab_size = len(index.getLexicon())
-
+    print("build token2id dict")
+    token2id = {term.term:i for i,term in enumerate(index_reader.terms())}
+    
     def tokenizer(text):
         tokens_ids = []
-        for token in pipe(pd.DataFrame([{"qid":0, "query":text.lower()}]))["query"][0]:
+        for token in index_reader.analyze(text.lower()):
+            #token_id=token2id[token]
             if token in token2id:
-                token_id=token2id[token]
-                if token_id is not None:
-                    tokens_ids.append(token_id)
+                tokens_ids.append(token2id[token])
+            #if token in token2id:
+            #    token_id=token2id[token]
+            #    if token_id is not None:
+            #        tokens_ids.append(token_id)
         return tokens_ids
 
-    bow = BagOfWords(tokenizer, vocab_size)
+    bow = BagOfWords(tokenizer, len(token2id))
 
     PATH_TO_MSMARCO = list(glob.glob(f"{msmarco_folder}/collection/corpus*"))[0]
     
@@ -57,7 +48,7 @@ def main(msmarco_folder, max_lines):
         return data["id"], data["contents"]
 
     with open(PATH_TO_MSMARCO) as f:
-        collection_iterator = enumerate(map(get_id_contents,f))
+        collection_iterator = map(get_id_contents,f)
         
         sparseCSR_collection = SparseCollectionCSR.from_text_iterator(collection_iterator,
                                                                         collection_maxsize=max_lines,
@@ -66,11 +57,11 @@ def main(msmarco_folder, max_lines):
                                                                         indices_dtype=TYPE.int32,
                                                                         backend="torch") 
 
-    sparseCSR_collection.save_to_file(f"csr_msmarco")
+    #sparseCSR_collection.save_to_file(f"csr_anserini")
 
     sparseCSR_collection.transform(BM25Transform(k1=1.2, b=0.75))
 
-    sparseCSR_collection.save_to_file(f"csr_msmarco_bm25_12_075")
+    sparseCSR_collection.save_to_file(os.path.join(msmarco_folder,f"csr_anserini_bm25_12_075"))
 
 
 if __name__ == '__main__':

@@ -40,13 +40,13 @@ def build_corpus_and_rels(data_path, dev_split, dataset_path):
     # copy corpus
     if not os.path.exists(dataset_path):
         os.mkdir(dataset_path)
+        os.mkdir(os.path.join(dataset_path,"collection"))
 
-    with open(os.path.join(dataset_path,f"corpus_L{len(corpus)}.jsonl"), "w") as fOut:
+    with open(os.path.join(dataset_path,"collection",f"corpus_L{len(corpus)}.jsonl"), "w") as fOut:
         for _id, data in corpus.items():
             data_to_write = {
-                "pmid": _id,
-                "title": data["title"],
-                "abstract": data["text"]
+                "id": _id,
+                "contents": data["title"] + " " + data["text"]
             }
             fOut.write(f"{json.dumps(data_to_write)}\n")
             
@@ -57,10 +57,9 @@ def build_corpus_and_rels(data_path, dev_split, dataset_path):
                     
                     data_to_write = {
                         "id": qid,
-                        "pmid": docid,
+                        "doc_id": docid,
                         "question": qtext,
-                        "title": corpus[docid]["title"],
-                        "abstract": corpus[docid]["text"]
+                        "doc_contents": data["title"] + " " + data["text"]
                     }
                     fOut.write(f"{json.dumps(data_to_write)}\n")
                     
