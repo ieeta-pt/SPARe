@@ -19,15 +19,16 @@ import os
 def main(msmarco_folder, max_lines):
     
     index_reader = IndexReader(f"{msmarco_folder}/anserini_index")
-    analyzer = Analyzer(get_lucene_analyzer())
+
     print("build token2id dict")
     token2id = {term.term:i for i,term in enumerate(index_reader.terms())}
     
     def tokenizer(text):
         tokens_ids = []
-        for token in analyzer.analyze(text.lower()):
+        for token in index_reader.analyze(text.lower()):
             #token_id=token2id[token]
-            tokens_ids.append(token2id[token])
+            if token in token2id:
+                tokens_ids.append(token2id[token])
             #if token in token2id:
             #    token_id=token2id[token]
             #    if token_id is not None:
@@ -36,18 +37,18 @@ def main(msmarco_folder, max_lines):
 
     bow = BagOfWords(tokenizer, len(token2id))
 
-    PATH_TO_MSMARCO = list(glob.glob(f"{msmarco_folder}/corpus*"))[0]
+    PATH_TO_MSMARCO = list(glob.glob(f"{msmarco_folder}/collection/corpus*"))[0]
     
     if max_lines==-1:
         max_lines = int(re.findall(r"_L([0-9]+)", PATH_TO_MSMARCO)[0])        
     
-    def get_title_abstract(string):
+    def get_id_contents(string):
         data = json.loads(string)
-        title, abstract = data["title"], data["abstract"]
-        return f"{title} {abstract}"
+        #text = data["id"], data["contents"]
+        return data["id"], data["contents"]
 
     with open(PATH_TO_MSMARCO) as f:
-        collection_iterator = enumerate(map(get_title_abstract,f))
+        collection_iterator = map(get_id_contents,f)
         
         sparseCSR_collection = SparseCollectionCSR.from_text_iterator(collection_iterator,
                                                                         collection_maxsize=max_lines,
