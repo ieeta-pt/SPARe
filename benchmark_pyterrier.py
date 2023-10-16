@@ -5,6 +5,8 @@ import click
 import json
 import time
 import os
+from collections import defaultdict
+from evaluate import evaluate_list
 
 @click.command()
 @click.argument("dataset_folder")
@@ -17,14 +19,20 @@ def main(dataset_folder, at):
     index = pt.IndexFactory.of(indexref)
     
 
+    qrels = defaultdict(dict)
+    run = {}
     with open(f"{dataset_folder}/relevant_pairs.jsonl") as f:
-        questions = list({line["question"] for line in map(json.loads, f)})
+        for q_data in map(json.loads, f):
+            run[q_data["id"]] = q_data["question"]
+            qrels[q_data["id"]][q_data["doc_id"]] = 1
+            
+    question_ids, questions = list(zip(*run.items()))
 
     # for large ats, pyterrier would be to slow
     # so we for now just run on a small question subset
     
     with open(f"results/pyterrier.csv", "a") as fOut:
-        questions = questions[:200]
+        questions = questions#[:200]
 
         bm25_pipe = pt.rewrite.tokenise() >> pt.BatchRetrieve(index, wmodel="BM25", num_results=at)#).parallel(3)
         
@@ -38,9 +46,16 @@ def main(dataset_folder, at):
 
             df_results = bm25_pipe.transform(questions_dataframe)
             
-            results.append(df_results["docno"].tolist())
+            results.append((df_results["docno"], df_results["score"]))
         
-        fOut.write(f"{dataset_folder},{at},{len(questions)/(time.time()-st)}\n")
+        end_t = time.time()
+        
+        #correct format
+        results = [list(zip(r[0].tolist(), r[1].tolist())) for r in results]
+        
+        r_evaluate = evaluate_list(qrels, results, question_ids)
+        
+        fOut.write(f"{dataset_folder},{at},{len(questions)/(end_t-st)},{r_evaluate['ndcg@10']},{r_evaluate['ndcg@1000']},{r_evaluate['recall@1000']}\n")
 
 
 if __name__=="__main__":

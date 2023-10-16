@@ -1,4 +1,4 @@
-from backend import AbstractBackend, TYPE
+from spare.backend import AbstractBackend, TYPE, RetrievalOutput
 import torch
 from safetensors.torch import save_file
 from safetensors import safe_open
@@ -8,6 +8,13 @@ import time
 class TorchBackend(AbstractBackend):
     
     def __init__(self):
+        if torch.cuda.is_available():
+            devices = [f"cuda:{i}" for i in range(torch.cuda.device_count())]
+        else:
+            devices = ["cpu"]
+        
+        super().__init__(devices)
+        
         self.types_converter = {
             TYPE.int32: torch.int32,
             TYPE.int64: torch.int64,
@@ -15,10 +22,7 @@ class TorchBackend(AbstractBackend):
             TYPE.float16: torch.float16,
         }
         
-        if torch.cuda.is_available():
-            self.devices = [f"cuda:{i}" for i in range(torch.cuda.device_count())]
-        else:
-            self.devices = ["cpu"]
+        
     
     def assign_data_to_tensor(self, tensor, indices_slices, values, dtype):
         tensor[indices_slices] = torch.tensor(values, dtype=self.types_converter[dtype])
@@ -70,26 +74,25 @@ class TorchBackend(AbstractBackend):
     def convert_dtype(self, tensor, dtype):
         return tensor.type(self.types_converter[dtype])
     
-    def fused_retrieve(self, questions_list, question_func, collection, top_k, collect_at=5000, profiling=False):
+    def fused_retrieve(self, questions_list, question_func, collection, top_k, collect_at=5000, profiling=False, return_scores=False):
         
         top_k = min(top_k, collection.shape[0])
         if len(self.devices)>1:
-            
-            return self._distributed_retrieval(questions_list, question_func, collection, top_k, collect_at=collect_at, profiling=profiling)
-
+            out = self._distributed_retrieval(questions_list, question_func, collection, top_k, collect_at=collect_at, profiling=profiling, return_scores=return_scores)
         else:
-            return self._single_retrieval(questions_list, question_func, collection, top_k, collect_at=collect_at, profiling=profiling)
+            out = self._single_retrieval(questions_list, question_func, collection, top_k, collect_at=collect_at, profiling=profiling, return_scores=return_scores)
+                
+        converted_indices = []
+        for i in range(out.ids.shape[0]):
+            q_indices = [collection.metadata.index2docID[idx] for idx in out.ids[i].tolist()]
+            converted_indices.append(q_indices)
         
-        #converted_indices = []
-        #values_list = []
-        #for i in range(indices_cpu.shape[0]):
-        #    q_indices = [collection.metadata.index2docID[idx] for idx in indices[i].tolist()]
-        #    converted_indices.append(q_indices)
-        
+        out.ids = converted_indices
+        return out
 
     
     
-    def _distributed_retrieval(self, questions_list, question_func, collection, top_k, collect_at, profiling):
+    def _distributed_retrieval(self, questions_list, question_func, collection, top_k, collect_at, profiling, return_scores):
         
         sparse_model= CSRSparseRetrievalDistributedModel(collection, top_k=top_k).to(self.devices[0])
         questions_dataset = DistributedQuestionDataset(questions_list, question_func, collection.shape[-1])
@@ -112,7 +115,8 @@ class TorchBackend(AbstractBackend):
             #results.append(r)
                 for i, out in enumerate(r):
                     results[i]["indices"].append(out.indices)
-                    results[i]["values"].append(out.values)
+                    if return_scores:
+                        results[i]["values"].append(out.values)
             
                 pbar.update(len(inputs))
         end_retrieval_time = time.time()
@@ -124,17 +128,16 @@ class TorchBackend(AbstractBackend):
 
         for d_id, out in results.items():
             indices_cpu.append(torch.stack(out["indices"]).cpu())
-            values_cpu.append(torch.stack(out["values"]).cpu())
+            if return_scores:
+                values_cpu.append(torch.stack(out["values"]).cpu())
             
         men_t_e = time.time()
         print("Mem transference time:", men_t_e-mem_t_s)
-            
-        if profiling:
-            return (indices_cpu, values_cpu), (len(questions_dataset)/(end_retrieval_time-start_retrieval_time), men_t_e-mem_t_s)
-        else:
-            return indices_cpu, values_cpu
         
-    def _single_retrieval(self, questions_list, question_func, collection, top_k, collect_at, profiling):
+        return RetrievalOutput(ids=indices_cpu, scores=values_cpu, timmings=(len(questions_dataset)/(end_retrieval_time-start_retrieval_time), men_t_e-mem_t_s))
+
+        
+    def _single_retrieval(self, questions_list, question_func, collection, top_k, collect_at, profiling, return_scores):
         
         sparse_model= CSRSparseRetrievalModel(collection, top_k=top_k).to(self.devices[0])
         questions_dataset = QuestionDataset(questions_list, question_func, collection.shape[-1])
@@ -150,22 +153,23 @@ class TorchBackend(AbstractBackend):
         for question in tqdm(dl):
             r = sparse_model(*[x.to(self.devices[0]) for x in question])
             indices.append(r.indices)
-            values.append(r.values)
+            if return_scores:
+                values.append(r.values)
         end_retrieval_time = time.time()
         print("Retrieval time:", end_retrieval_time-start_retrieval_time, "QPS", len(questions_dataset)/(end_retrieval_time-start_retrieval_time))
         
         mem_t_s = time.time()
         indices_cpu = torch.stack(indices).cpu()
-        values_cpu = torch.stack(values).cpu()
+        values_cpu = None
+        if return_scores:
+            values_cpu = torch.stack(values).cpu()
         
         men_t_e = time.time()
         print("Mem transference time:", men_t_e-mem_t_s)
         
-        if profiling:
-            return (indices_cpu, values_cpu), (len(questions_dataset)/(end_retrieval_time-start_retrieval_time), men_t_e-mem_t_s)
-        else:
-            return indices_cpu, values_cpu
-            
+        return RetrievalOutput(ids=indices_cpu, scores=values_cpu, timmings=(len(questions_dataset)/(end_retrieval_time-start_retrieval_time), men_t_e-mem_t_s))
+    
+
 class CSRSparseRetrievalModel(torch.nn.Module):
     def __init__(self, sparse_collection, top_k = 10):
         super().__init__()

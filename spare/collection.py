@@ -1,12 +1,11 @@
-from typing import List
-from backend import TYPE
-from utils import get_coo_sparce_GB, get_csr_sparce_GB
+from spare.backend import TYPE
+from spare.utils import get_coo_sparce_GB, get_csr_sparce_GB
 from tqdm import tqdm
-from metadata import MetaDataDFandDL
+from spare.metadata import MetaDataDFandDL
 import os
 import jsonpickle
 import shutil
-from weighting_model import WeightingSchemaType, CountingWeightingSchema
+from spare.weighting_model import WeightingSchemaType, CountingWeightingSchema
 
 class SparseCollection:
     ### implements a COO sparse matrix
@@ -20,6 +19,7 @@ class SparseCollection:
                  backend="torch") -> None:
         super().__init__()
 
+        
         self.collection_maxsize = collection_maxsize
                 
         if isinstance(dtype, int):  
@@ -36,7 +36,7 @@ class SparseCollection:
             self.vec_dim = vec_dim
         
         if backend=="torch":
-            from backend_torch import TorchBackend
+            from spare.backend_torch import TorchBackend
             self.backend = TorchBackend()
         else:
             RuntimeError("Only torch backend is currently supported")

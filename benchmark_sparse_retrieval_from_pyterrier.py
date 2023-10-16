@@ -1,23 +1,21 @@
-from collection import SparseCollection, SparseCollectionCSR
-from retriever import SparseRetriever
-from weighting_model import BM25WeightingModel
-from backend import TYPE
+from spare.collection import SparseCollection, SparseCollectionCSR
+from spare.retriever import SparseRetriever
+from spare.weighting_model import BM25WeightingModel
+from spare.backend import TYPE
 import json
-import psutil
-from text2vec import BagOfWords
-import torch
-from collections import defaultdict
-from tqdm import tqdm
-import multiprocessing  as mp
-from transformations import DtypeTransform
-import os
+
+from spare.text2vec import BagOfWords
+
+from spare.transformations import DtypeTransform
 
 import pyterrier  as pt
 import pandas as pd
 
-import torch.nn as nn
 import time 
 import click
+from collections import defaultdict
+
+from evaluate import evaluate_spare
 
 @click.command()
 @click.argument("dataset_folder")
@@ -74,11 +72,16 @@ def main(dataset_folder, at, cache_bow, fp_16):
     
     print("dtype values", sparse_collection.sparse_vecs[-1].dtype)
     
+    qrels = defaultdict(dict)
+    run = {}
     with open(f"{dataset_folder}/relevant_pairs.jsonl") as f:
-        questions = list({line["question"] for line in map(json.loads, f)})
+        for q_data in map(json.loads, f):
+            run[q_data["id"]] = q_data["question"]
+            qrels[q_data["id"]][q_data["doc_id"]] = 1
+    
+    question_ids, questions = list(zip(*run.items()))
     
     bow = BagOfWords(tokenizer, vocab_size)
-
     
     if cache_bow:
         questions = list(map(bow, questions))
@@ -88,20 +91,23 @@ def main(dataset_folder, at, cache_bow, fp_16):
     sparse_retriver = SparseRetriever(sparse_collection, bow, BM25WeightingModel())
 
     # load a large number of questions
-    
-        
     print("Num questions", len(questions))
     
     #questions = questions[:10000]
         
     s = time.time()
     # Retrieve by default utilizes the maximum amount of resources available
-    out, times = sparse_retriver.retrieve(questions, top_k=at, profiling=True) # TODO load directly to the device
+    out = sparse_retriver.retrieve(questions, top_k=at, return_scores=True, profiling=True) # TODO load directly to the device
+    times = out.timmings
     e = time.time()
+    
+    r_evaluate = evaluate_spare(qrels, out, question_ids)
+    
+    #"recall@1000", "ndcg@10", "ndcg@10000"
     
     with open(f"results/sparse_retriever_from_pyterrier_devices_{'-'.join(sparse_collection.backend.devices)}{notes}.csv", "a") as fOut:
         print("Total retrieve time", (e-s), "QPS", len(questions)/(e-s))
-        fOut.write(f"{dataset_folder},{at},{len(questions)/(e-s)},{times[0]},{times[1]}\n")
+        fOut.write(f"{dataset_folder},{at},{len(questions)/(e-s)},{r_evaluate['ndcg@10']},{r_evaluate['ndcg@1000']},{r_evaluate['recall@1000']},{times[0]},{times[1]}\n")
     
 if __name__=="__main__":
     main()

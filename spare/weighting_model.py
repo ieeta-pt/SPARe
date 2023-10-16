@@ -1,11 +1,10 @@
-from utils import idf_weighting
 from enum import Enum
 import json
 from typing import Any
-from backend import TYPE
+from spare.backend import TYPE
 from tqdm import tqdm
-from utils import idf_weighting
-from metadata import MetaDataDFandDL
+from spare.utils import idf_weighting
+from spare.metadata import MetaDataDFandDL
 import jsonpickle
 
 class WeightingSchemaType(Enum):

@@ -1,7 +1,13 @@
 
 from enum import Enum
 from collections import defaultdict
+from dataclasses import dataclass
 
+@dataclass
+class RetrievalOutput:
+    ids: list
+    scores: list
+    timmings: tuple = None
 
 class Singleton(type):
     _instances = {}
@@ -17,6 +23,9 @@ class TYPE(Enum):
     float32 = 4
 
 class AbstractBackend(metaclass=Singleton):
+    
+    def __init__(self, devices):
+        self.devices=devices
     
     def create_zero_tensor(self, shape, dtype):
         raise NotImplementedError

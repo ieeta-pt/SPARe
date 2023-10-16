@@ -1,0 +1,23 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "spare"
+authors = [{name = "Tiago Almeida", email = "tiagomeloalmeida@ua.pt"}]
+readme = "README.md"
+license = {file = "LICENSE"}
+classifiers = ["License :: OSI Approved :: Apache Software License"]
+dynamic = ["version", "description"]
+
+[tool.flit.metadata]
+requires = [
+    "jsonpickle",
+    "safetensors"
+]
+
+[tool.flit.metadata.requires-extra]
+pyterrier = ["python-terrier"]
+pyserini = ["pyserini"]
+torch = ["torch"]
+jax = ["jax[cuda12_pip]"]
