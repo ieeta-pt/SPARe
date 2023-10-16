@@ -54,8 +54,8 @@ def main(dataset_folder, at):
         results = [list(zip(r[0].tolist(), r[1].tolist())) for r in results]
         
         r_evaluate = evaluate_list(qrels, results, question_ids)
-        
-        fOut.write(f"{dataset_folder},{at},{len(questions)/(end_t-st)},{r_evaluate['ndcg@10']},{r_evaluate['ndcg@1000']},{r_evaluate['recall@1000']}\n")
+        print(r_evaluate)
+        fOut.write(f"{dataset_folder},{at},{len(questions)/(end_t-st)},{r_evaluate['ndcg@10']},{r_evaluate['ndcg@10000']},{r_evaluate['recall@1000']}\n")
 
 
 if __name__=="__main__":

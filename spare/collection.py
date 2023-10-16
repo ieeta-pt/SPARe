@@ -5,7 +5,7 @@ from spare.metadata import MetaDataDFandDL
 import os
 import jsonpickle
 import shutil
-from spare.weighting_model import WeightingSchemaType, CountingWeightingSchema
+from spare.weighting_model import WeightingSchemaType, CountingWeightingSchema, BM25WeightingSchema
 
 class SparseCollection:
     ### implements a COO sparse matrix
@@ -77,6 +77,37 @@ class SparseCollection:
         sparse_collection = cls(collection_maxsize, vec_dim=vec_dim, dtype=dtype, backend=backend, **kwargs)
         
         sparse_collection._build_sparse_collection(iterator, max_files_for_estimation=max_files_for_estimation)
+        
+        return sparse_collection
+    
+    @classmethod
+    def from_bm25_pyserini_iterator(cls,
+                                    index_path,
+                                    k1=1.2,
+                                    b=0.75,
+                                    dtype=TYPE.float32, 
+                                    max_files_for_estimation=1000,
+                                    backend="torch",
+                                    **kwargs):
+        
+        from spare.pyserini_compatibility import bm25_pyserini_iterator
+        from pyserini.index.lucene import IndexReader
+        
+        index_reader = IndexReader(index_path)
+        
+        sparse_collection = cls(index_reader.stats()["documents"], 
+                                vec_dim=index_reader.stats()["unique_terms"], 
+                                dtype=dtype, 
+                                weighting_schema=BM25WeightingSchema,
+                                backend=backend, 
+                                **kwargs)
+        
+        # probably can skip estimation
+        sparse_collection._build_sparse_collection(bm25_pyserini_iterator(index_reader, k1=k1, b=b), 
+                                                   max_files_for_estimation=max_files_for_estimation)
+        
+        sparse_collection.weighting_schema.k1 = k1
+        sparse_collection.weighting_schema.b = b
         
         return sparse_collection
     
