@@ -1,4 +1,4 @@
-from spare.backend import TYPE
+from spare import TYPE
 import math
 
 

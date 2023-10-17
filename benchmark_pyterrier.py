@@ -18,13 +18,17 @@ def main(dataset_folder, at):
     indexref = pt.IndexRef.of(f"./{dataset_folder}/terrier_index/")
     index = pt.IndexFactory.of(indexref)
     
+    threshold_for_at = {10:99999, 100:99999, 1000:99999, 10000:200, 100000:60}
 
     qrels = defaultdict(dict)
     run = {}
     with open(f"{dataset_folder}/relevant_pairs.jsonl") as f:
-        for q_data in map(json.loads, f):
+        for i, q_data in enumerate(map(json.loads, f)):
             run[q_data["id"]] = q_data["question"]
             qrels[q_data["id"]][q_data["doc_id"]] = 1
+            
+            if i>threshold_for_at[at]:
+                break
             
     question_ids, questions = list(zip(*run.items()))
 
@@ -55,7 +59,7 @@ def main(dataset_folder, at):
         
         r_evaluate = evaluate_list(qrels, results, question_ids)
         print(r_evaluate)
-        fOut.write(f"{dataset_folder},{at},{len(questions)/(end_t-st)},{r_evaluate['ndcg@10']},{r_evaluate['ndcg@10000']},{r_evaluate['recall@1000']}\n")
+        fOut.write(f"{dataset_folder},{at},{len(questions)/(end_t-st)},{r_evaluate['ndcg@10']},{r_evaluate['ndcg@1000']},{r_evaluate['recall@1000']}\n")
 
 
 if __name__=="__main__":

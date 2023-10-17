@@ -1,4 +1,5 @@
-from spare.backend import AbstractBackend, TYPE, RetrievalOutput
+from spare import TYPE
+from spare.backend import AbstractBackend, RetrievalOutput
 from safetensors.jax import save_file
 from safetensors import safe_open
 from tqdm import tqdm
@@ -12,9 +13,9 @@ class JaxBackend(AbstractBackend):
         super().__init__(jax.devices())
         
         self.types_converter = {
-            TYPE.int32: jnp.int32,
-            TYPE.int64: jnp.int64,
-            TYPE.float32: jnp.float32,
-            TYPE.float16: jnp.float16,
+            spare.int32: jnp.int32,
+            spare.int64: jnp.int64,
+            spare.float32: jnp.float32,
+            spare.float16: jnp.float16,
         }
         

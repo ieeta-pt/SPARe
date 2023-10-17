@@ -15,12 +15,7 @@ class Singleton(type):
         if cls not in cls._instances:
             cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
         return cls._instances[cls]
-   
-class TYPE(Enum):
-    int32 = 1
-    int64 = 2
-    float16 = 3
-    float32 = 4
+
 
 class AbstractBackend(metaclass=Singleton):
     

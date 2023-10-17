@@ -1,7 +1,7 @@
 from enum import Enum
 import json
 from typing import Any
-from spare.backend import TYPE
+from spare import TYPE
 from tqdm import tqdm
 from spare.utils import idf_weighting
 from spare.metadata import MetaDataDFandDL

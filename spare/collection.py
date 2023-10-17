@@ -1,4 +1,4 @@
-from spare.backend import TYPE
+from spare import TYPE
 from spare.utils import get_coo_sparce_GB, get_csr_sparce_GB
 from tqdm import tqdm
 from spare.metadata import MetaDataDFandDL
@@ -81,7 +81,7 @@ class SparseCollection:
         return sparse_collection
     
     @classmethod
-    def from_bm25_pyserini_iterator(cls,
+    def from_bm25_pyserini_index(cls,
                                     index_path,
                                     k1=1.2,
                                     b=0.75,
@@ -108,6 +108,7 @@ class SparseCollection:
         
         sparse_collection.weighting_schema.k1 = k1
         sparse_collection.weighting_schema.b = b
+        sparse_collection.weighting_schema.idf_weighting = None
         
         return sparse_collection
     

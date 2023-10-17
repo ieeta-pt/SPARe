@@ -5,14 +5,14 @@ def evaluate_spare(qrels, spare_result, question_ids):
     ranx_run = defaultdict(dict)
     
     for i in range(len(spare_result.ids)):
-        scores = spare_result.scores[i].tolist()
+        scores = spare_result.scores[i]
         for j in range(len(spare_result.ids[i])):
             ranx_run[question_ids[i]][spare_result.ids[i][j]] = scores[j]
             
     qrels = Qrels(qrels)
     ranx_sp_run = Run(ranx_run)
     
-    return evaluate(qrels, ranx_sp_run, ["recall@1000", "ndcg@10", "ndcg@10000"])
+    return evaluate(qrels, ranx_sp_run, ["recall@1000", "ndcg@10", "ndcg@1000"])
 
 def evaluate_list(qrels, results, question_ids):
     
@@ -26,4 +26,4 @@ def evaluate_list(qrels, results, question_ids):
     qrels = Qrels(qrels)
     ranx_sp_run = Run(ranx_run)
     
-    return evaluate(qrels, ranx_sp_run, ["recall@1000", "ndcg@10", "ndcg@10000"], make_comparable=True)
+    return evaluate(qrels, ranx_sp_run, ["recall@1000", "ndcg@10", "ndcg@1000"], make_comparable=True)
