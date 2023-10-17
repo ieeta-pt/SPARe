@@ -38,7 +38,7 @@ def main(dataset_folder, at):
     with open(f"results/pyterrier.csv", "a") as fOut:
         questions = questions#[:200]
 
-        bm25_pipe = pt.rewrite.tokenise() >> pt.BatchRetrieve(index, wmodel="BM25", num_results=at)#).parallel(3)
+        bm25_pipe = pt.rewrite.tokenise() >> pt.BatchRetrieve(index, wmodel="BM25", controls={"bm25.k3" : 0}, num_results=at)#).parallel(3)
         
         results = []
         time_list = []
