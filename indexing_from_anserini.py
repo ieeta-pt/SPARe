@@ -1,11 +1,11 @@
-from collection import SparseCollection, SparseCollectionCSR
-from backend import TYPE
+from spare.collection import SparseCollection, SparseCollectionCSR
+from spare import TYPE
 import json
-from text2vec import BagOfWords
+from spare.text2vec import BagOfWords
 import torch
 from collections import defaultdict
 from tqdm import tqdm
-from weighting_model import BM25Transform
+from spare.weighting_model import BM25Transform
 import click
 from pyserini.index.lucene import IndexReader
 from pyserini.analysis import Analyzer, get_lucene_analyzer
