@@ -82,12 +82,13 @@ class TorchBackend(AbstractBackend):
             out = self._distributed_retrieval(questions_list, question_func, collection, top_k, collect_at=collect_at, profiling=profiling, return_scores=return_scores)
         else:
             out = self._single_retrieval(questions_list, question_func, collection, top_k, collect_at=collect_at, profiling=profiling, return_scores=return_scores)
-                
+        
+        s_time = time.time()
         converted_indices = []
         for i in range(len(out.ids)):
             q_indices = [collection.metadata.index2docID[idx] for idx in out.ids[i]]
             converted_indices.append(q_indices)
-        
+        print("Time to convert docs ids",time.time()-s_time )
         out.ids = converted_indices
         return out
 

@@ -33,10 +33,16 @@ class WeightingSchema:
         
         self._load_vars(data)
         
+    def get_weighting_model(self):
+        raise NotImplementedError()
+        
 class CountingWeightingSchema(WeightingSchema):
     def __init__(self) -> None:
         super().__init__(WeightingSchemaType.counting)
-        
+    
+    def get_weighting_model(self):
+        raise WeightingModel()
+    
     def __repr__(self) -> str:
         return "CountingWeightingSchema"
         
@@ -46,6 +52,10 @@ class BM25WeightingSchema(WeightingSchema):
         self.k1 = k1
         self.b = b
         self.idf_weighting = idf_weighting
+    
+    def get_weighting_model(self):
+        raise BM25WeightingModel(k1=self.k1, b=self.b, idf_weighting=self.idf_weighting)
+    
     
     def _get_vars_to_save(self):
         return super()._get_vars_to_save() | {
@@ -63,7 +73,17 @@ class BM25WeightingSchema(WeightingSchema):
     def __repr__(self) -> str:
         return f"BM25WeightingSchema(k1:{self.k1}, b:{self.b}, idf: {self.idf_weighting})"
 
-class BM25WeightingModel:
+class WeightingModel:
+    
+    def transform_query(self, query):
+        # apply the weighting scheme to the query bow if its applicable
+        return query
+    
+    def transform_collection(self, collection, inplace=True):
+        return collection
+    
+
+class BM25WeightingModel(WeightingModel):
     
     def __init__(self, k1=None, b=None, k3=None, idf_weighting=None) -> None:
         self.k1 = k1

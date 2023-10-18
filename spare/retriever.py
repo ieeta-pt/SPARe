@@ -3,9 +3,12 @@ from tqdm import tqdm
 
 class SparseRetriever:
     
-    def __init__(self, collection, bow, weighting_model):
+    def __init__(self, collection, bow, weighting_model=None):
         # apply ranking_model
-        self.weighting_model = weighting_model
+        if weighting_model is None:
+            self.weighting_model = collection.get_weighting_model()
+        else:
+            self.weighting_model = weighting_model
         
         self.backend = collection.backend
         self.bow = bow

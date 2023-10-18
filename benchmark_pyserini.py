@@ -63,7 +63,7 @@ def main(dataset_folder, at, threads):
     
     r_evaluate = evaluate_list(qrels, results, question_ids)
     
-    out_file_name = "pyseniri"
+    out_file_name = "pyserini"
     if threads>1:
         out_file_name += f"_mp{threads}"
     
