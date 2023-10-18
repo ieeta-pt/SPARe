@@ -158,8 +158,8 @@ class BM25TransformForCOO(BM25Transform):
         
         return k1_plus_one, d_partial_constant1, d_partial_constant2, idf
         
-    def _convert(self, indices, values, shape, nnz, metadata, dtype, backend):
-        indices, values = collection.sparce_vecs
+    def _convert(self, collection):
+        indices, values = collection.sparse_vecs
         shape = collection.shape
         nnz = collection.nnz
         metadata = collection.metadata
@@ -181,7 +181,7 @@ class BM25TransformForCOO(BM25Transform):
 class BM25TransformForCSR(BM25TransformForCOO):
     
     def _convert(self, collection):
-        crow_indices, col_indices, values = collection.sparce_vecs
+        crow_indices, col_indices, values = collection.sparse_vecs
         shape = collection.shape
         nnz = collection.nnz
         metadata = collection.metadata
