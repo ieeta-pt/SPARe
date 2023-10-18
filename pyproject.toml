@@ -9,14 +9,13 @@ readme = "README.md"
 license = {file = "LICENSE"}
 classifiers = ["License :: OSI Approved :: Apache Software License"]
 dynamic = ["version", "description"]
-
-[tool.flit.metadata]
-requires = [
+requires-python = ">=3.9"
+dependencies  = [
     "jsonpickle",
     "safetensors"
 ]
 
-[tool.flit.metadata.requires-extra]
+[project.optional-dependencies]
 pyterrier = ["python-terrier"]
 pyserini = ["pyserini"]
 torch = ["torch"]
