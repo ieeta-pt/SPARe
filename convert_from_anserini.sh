@@ -2,7 +2,7 @@ for f in beir_datasets/*
 do
 	echo "Processing $f"
 
-    if [ ! -f "$f/anserini_index" ]; then
+    if [ ! -d "$f/anserini_index" ]; then
         python -m pyserini.index.lucene \
                         --collection JsonCollection \
                         --input $f/collection \
