@@ -1,6 +1,6 @@
 for f in beir_datasets/*
 do
-    for at in 10 100 1000 10000 100000
+    for at in 10 100 1000 10000
     do
         echo $f $at
         python benchmark_pyserini.py $f $at
