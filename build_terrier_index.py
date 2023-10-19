@@ -14,9 +14,13 @@ pt.set_property("max.term.length", "150")
 @click.argument("dataset_folder")
 def main(dataset_folder):
     
+    if os.path.exists(os.path.join(dataset_path, "terrier_index")):
+        print(f"Skip {dataset_path}, terrier index already exists")
+        return 0
+    
     dataset_path = dataset_folder
     
-   
+       
     print(dataset_path)
     print()
     #if os.path.exists(os.path.join(dataset_path, "terrier_index")):
@@ -40,8 +44,8 @@ def main(dataset_folder):
     
     index_path = os.path.join("./",dataset_path, "terrier_index")
     
-    if os.path.exists(index_path):
-        shutil.rmtree(index_path)
+    #if os.path.exists(index_path):
+    #    shutil.rmtree(index_path)
     
     print(pt.ApplicationSetup.appProperties.getProperty("max.term.length", "none"))
     
