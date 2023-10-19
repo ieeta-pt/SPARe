@@ -18,6 +18,10 @@ import os
 @click.option("--max_lines", default=-1)
 def main(msmarco_folder, max_lines):
     
+    if os.path.exists(os.path.join(msmarco_folder,f"csr_anserini_bm25_12_075")):
+        print(f"Skip {msmarco_folder}, already exists")
+        return 0
+    
     index_reader = IndexReader(f"{msmarco_folder}/anserini_index")
 
     print("build token2id dict")

@@ -16,7 +16,7 @@ import pandas as pd
 import glob
 import re
 import os
-from utils import terrier_idf
+from spare.utils import terrier_idf
 
 from multiprocessing import Queue
 
@@ -93,6 +93,10 @@ def tokenizerworker(q_in: Queue, q_out: Queue, msmarco_folder, identifier):
 @click.option("--process", default=8)
 @click.option("--max_lines", default=-1)
 def main(dataset_folder, process, max_lines):
+    
+    if os.path.exists(os.path.join(dataset_folder,f"csr_terrier_bm25_12_075")):
+        print(f"Skip {dataset_folder}, already exists")
+        return 0
     
     PATH_TO_MSMARCO = list(glob.glob(f"{dataset_folder}/collection/corpus*"))[0]
     if not pt.started():
