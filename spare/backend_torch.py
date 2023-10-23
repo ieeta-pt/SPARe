@@ -5,6 +5,7 @@ from safetensors.torch import save_file
 from safetensors import safe_open
 from tqdm import tqdm
 import time
+import numpy as np
 
 class TorchBackend(AbstractBackend):
     
@@ -83,13 +84,6 @@ class TorchBackend(AbstractBackend):
         else:
             out = self._single_retrieval(questions_list, question_func, collection, top_k, collect_at=collect_at, profiling=profiling, return_scores=return_scores)
         
-        s_time = time.time()
-        converted_indices = []
-        for i in range(len(out.ids)):
-            q_indices = [collection.metadata.index2docID[idx] for idx in out.ids[i]]
-            converted_indices.append(q_indices)
-        print("Time to convert docs ids",time.time()-s_time )
-        out.ids = converted_indices
         return out
 
     
@@ -129,29 +123,30 @@ class TorchBackend(AbstractBackend):
         values_cpu_per_device = []
 
         for d_id, out in results.items():
-            indices_cpu_per_device.append(torch.stack(out["indices"]).cpu().tolist())
+            indices_cpu_per_device.append(torch.stack(out["indices"]).cpu())
             if return_scores:
-                values_cpu_per_device.append(torch.stack(out["values"]).cpu().tolist())
+                values_cpu_per_device.append(torch.stack(out["values"]).cpu())
         
         # correct the q_id order
         indices_cpu = []
         values_cpu = []
         
+        convert_s_time = time.time()
         for j in range(len(indices_cpu_per_device[0])):
             for d_id in range(len(indices_cpu_per_device)):
                 if j<len(indices_cpu_per_device[d_id]):
                     indices_cpu.append(indices_cpu_per_device[d_id][j])
                     if return_scores:
                         values_cpu.append(values_cpu_per_device[d_id][j])
-                
+        convert_e_time = time.time() 
         
         men_t_e = time.time()
-        print("Mem transference time:", men_t_e-mem_t_s)
+        print("Mem transference time:", men_t_e-mem_t_s, "Without tolist, convert time:", convert_e_time - convert_s_time)
         
         #if return_scores:
         #    values_cpu = torch.concat(values_cpu, axis=0)
         # concat is slow
-        return RetrievalOutput(ids=indices_cpu, scores=values_cpu, timmings=(len(questions_dataset)/(end_retrieval_time-start_retrieval_time), men_t_e-mem_t_s))
+        return RetrievalOutput(ids=indices_cpu, scores=np.array(values_cpu), timmings=(len(questions_dataset)/(end_retrieval_time-start_retrieval_time), men_t_e-mem_t_s))
 
         
     def _single_retrieval(self, questions_list, question_func, collection, top_k, collect_at, profiling, return_scores):
@@ -176,10 +171,10 @@ class TorchBackend(AbstractBackend):
         print("Retrieval time:", end_retrieval_time-start_retrieval_time, "QPS", len(questions_dataset)/(end_retrieval_time-start_retrieval_time))
         
         mem_t_s = time.time()
-        indices_cpu = torch.stack(indices).cpu().tolist()
+        indices_cpu = torch.stack(indices).cpu()#.tolist()
         values_cpu = None
         if return_scores:
-            values_cpu = torch.stack(values).cpu().tolist()
+            values_cpu = torch.stack(values).cpu()#.tolist()
         
         men_t_e = time.time()
         print("Mem transference time:", men_t_e-mem_t_s)

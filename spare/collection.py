@@ -149,6 +149,9 @@ class SparseCollection:
         self.sparse_vecs = self._build_sparse_tensor(iterator, self.collection_maxsize, elements_expected, list_bow_for_estimation)
         del list_bow_for_estimation
         
+        # lets optimize the metadata
+        self.metadata.optimize()
+        
     
     def _build_sparse_tensor(self, iterator, collection_maxsize, elements_expected, list_bow_for_estimation):
         

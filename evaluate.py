@@ -3,16 +3,25 @@ from collections import defaultdict
 
 def evaluate_spare(qrels, spare_result, question_ids):
     ranx_run = defaultdict(dict)
+    spare_result_ids = spare_result.ids#.tolist()
+    spare_result_scores = spare_result.scores#.tolist()
     
-    for i in range(len(spare_result.ids)):
-        scores = spare_result.scores[i]
-        for j in range(len(spare_result.ids[i])):
-            ranx_run[question_ids[i]][spare_result.ids[i][j]] = scores[j]
-            
+    max_at = 1000
+    
+    print("Converting to ranx format")
+    for i in range(len(spare_result_ids)):
+        scores = spare_result_scores[i]
+        for j in range(max_at):
+            ranx_run[question_ids[i]][str(spare_result_ids[i][j])] = scores[j]
+    
+    
+    print("Build Qrels and Run")
     qrels = Qrels(qrels)
     ranx_sp_run = Run(ranx_run)
     
-    return evaluate(qrels, ranx_sp_run, ["recall@1000", "ndcg@10", "ndcg@1000"])
+    print("START EVALUATE?")
+    
+    return evaluate(qrels, ranx_sp_run, [f"recall@{max_at}", "ndcg@10", f"ndcg@{max_at}"])
 
 def evaluate_list(qrels, results, question_ids):
     
