@@ -8,7 +8,7 @@ import shutil
 from spare.weighting_model import WeightingSchemaType, CountingWeightingSchema, BM25WeightingSchema
 
 
-class AbtractSparseCollection:
+class AbstractSparseCollection:
     """
     A SparseCollection without a concrete implementation
     """
@@ -193,19 +193,6 @@ class AbtractSparseCollection:
     def _init_sparse_vecs(self, elements_expected):
         raise NotImplementedError("method _init_sparse_vecs was not implemented, if this is an AbtractSparseCollection. Then the behaviour is expected.")
     
-    def _sparcify_bow_and_meta_update(self, bow, index_docs):
-        py_indices_row = []
-        py_indices_col = []
-        py_values = []
-        for token_index in sorted(bow.keys()):
-            py_indices_row.append(index_docs)
-            py_indices_col.append(token_index)
-            py_values.append(bow[token_index])
-            
-        self.metadata.update(index_docs, py_indices_col, py_values)
-        
-        return py_indices_row, py_indices_col, py_values
-    
     def _update_sparse_vecs(self, indices, values, bow, element_index, index_docs):
         raise NotImplementedError("method _update_sparse_vecs was not implemented, if this is an AbtractSparseCollection. Then the behaviour is expected.")
 
@@ -285,6 +272,19 @@ class SparseCollectionCOO(AbstractSparseCollection):
         
         return indices, values
     
+    def _sparcify_bow_and_meta_update(self, bow, index_docs):
+        py_indices_row = []
+        py_indices_col = []
+        py_values = []
+        for token_index in sorted(bow.keys()):
+            py_indices_row.append(index_docs)
+            py_indices_col.append(token_index)
+            py_values.append(bow[token_index])
+            
+        self.metadata.update(index_docs, py_indices_col, py_values)
+        
+        return py_indices_row, py_indices_col, py_values
+    
     def _update_sparse_vecs(self, indices, values, bow, element_index, index_docs):
         
         py_indices_row, py_indices_col, py_values = self._sparcify_bow_and_meta_update(bow, index_docs)
@@ -316,7 +316,7 @@ class SparseCollectionCOO(AbstractSparseCollection):
         
         return indices, values
         
-class SparseCollectionCSR(AbstractSparseCollection):
+class SparseCollectionCSR(SparseCollectionCOO):
     # sparse collection imlemented with csr
     def __init__(self, 
                  *args,
