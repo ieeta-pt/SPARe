@@ -1,5 +1,6 @@
 import time 
 from tqdm import tqdm
+import numpy as np
 
 class SparseRetriever:
     
@@ -39,13 +40,25 @@ class SparseRetriever:
         def query_transform(query):
             return self.weighting_model.transform_query(self.bow(query)
                                                            )
-        return self.backend.fused_retrieve(questions_list, 
+        out = self.backend.fused_retrieve(questions_list, 
                                            query_transform,
                                            self.collection, 
                                            top_k,
                                            collect_at=collect_at,
                                            profiling=profiling,
                                            return_scores=return_scores)
+        
+        # maybe convert index2docID if docID!=index
+        
+        s_time = time.time()
+        converted_indices = []
+        for i in range(len(out.ids)):
+            q_indices = self.collection.metadata.index2docID[out.ids[i]]#[self.collection.metadata.index2docID[idx] for idx in out.ids[i]]
+            converted_indices.append(q_indices)
+        print("Time to convert docs ids",time.time()-s_time )
+        out.ids = np.array(converted_indices)
+        
+        return out
   
             
             

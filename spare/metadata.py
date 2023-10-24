@@ -1,15 +1,29 @@
 from collections import defaultdict
+from spare.utils import get_best_np_dtype_for
 from enum import Enum
 import pickle
+import numpy as np
 
 class MetaDataDocID:
     # stores a mapping for the doc_ID
     def __init__(self) -> None:
-        self.index2docID = {}
+        self.index2docID = []
         
     def register_docid(self, index, docID):
-        self.index2docID[index] = docID
+        assert(index == len(self.index2docID))
+        self.index2docID.append(docID)
 
+    def optimize(self):
+        # convert to np array
+        try:
+            self.index2docID = list(map(int, self.index2docID))
+            # select the best dtype
+            dtype = get_best_np_dtype_for(min(self.index2docID), max(self.index2docID))
+            self.index2docID = np.array(self.index2docID, dtype=dtype)
+        except ValueError as e:
+            # will default to str or object in the worst case
+            self.index2docID = np.array(self.index2docID)
+        
     def _get_vars_to_save(self):
         return {"index2docID": self.index2docID}
     

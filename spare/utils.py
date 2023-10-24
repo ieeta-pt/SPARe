@@ -1,6 +1,23 @@
 from spare import TYPE
 import math
+import numpy as np
 
+def get_best_np_dtype_for(min_value, max_value):
+    uint32_bounds = np.iinfo("uint32")
+    uint64_bounds = np.iinfo("uint64")
+    int32_bounds = np.iinfo("int32")
+    int64_bounds = np.iinfo("int64")
+    
+    if uint32_bounds.min <= min_value and max_value <= uint32_bounds.max:
+        return np.uint32
+    elif uint64_bounds.min <= min_value and max_value <= uint64_bounds.max:
+        return np.uint64
+    elif int32_bounds.min <= min_value and max_value <= int32_bounds.max:
+        return np.int32
+    elif int64_bounds.min <= min_value and max_value <= int64_bounds.max:
+        return np.int64
+    else:
+        raise ValueError("Values are out of bounds for the specified dtypes.")
 
 LOG_E_OF_2 = math.log(2)
 LOG_2_OF_E = 1 / LOG_E_OF_2
