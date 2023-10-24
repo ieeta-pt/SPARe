@@ -113,10 +113,10 @@ class AbstractSparseCollection:
             raise ValueError("Your current collection weighing schema or metadata is not compatible with the transformation asked.")
     
     def get_sparce_matrix(self):
-        raise NotImplementedError("method get_sparce_matrix was not implemented, if this is an AbtractSparseCollection. Then the behaviour is expected.")
+        raise NotImplementedError("method get_sparce_matrix was not implemented, if this is an AbstractSparseCollection. Then the behaviour is expected.")
     
     def _correct_transform_operator(self, transform_operator):
-        raise NotImplementedError("method _correct_transform_operator was not implemented, if this is an AbtractSparseCollection. Then the behaviour is expected.")
+        raise NotImplementedError("method _correct_transform_operator was not implemented, if this is an AbstractSparseCollection. Then the behaviour is expected.")
     
     def _build_sparse_collection(self, iterator, max_files_for_estimation):
         
@@ -188,17 +188,17 @@ class AbstractSparseCollection:
         return self._slice_sparse_vecs(*sparse_vecs, element_index)
             
     def _slice_sparse_vecs(self, indices, values, element_index):
-        raise NotImplementedError("method _slice_sparse_vecs was not implemented, if this is an AbtractSparseCollection. Then the behaviour is expected.")
+        raise NotImplementedError("method _slice_sparse_vecs was not implemented, if this is an AbstractSparseCollection. Then the behaviour is expected.")
  
     def _init_sparse_vecs(self, elements_expected):
-        raise NotImplementedError("method _init_sparse_vecs was not implemented, if this is an AbtractSparseCollection. Then the behaviour is expected.")
+        raise NotImplementedError("method _init_sparse_vecs was not implemented, if this is an AbstractSparseCollection. Then the behaviour is expected.")
     
     def _update_sparse_vecs(self, indices, values, bow, element_index, index_docs):
-        raise NotImplementedError("method _update_sparse_vecs was not implemented, if this is an AbtractSparseCollection. Then the behaviour is expected.")
+        raise NotImplementedError("method _update_sparse_vecs was not implemented, if this is an AbstractSparseCollection. Then the behaviour is expected.")
 
     
     def get_sparce_matrix_space(self):
-        raise NotImplementedError("method get_sparce_matrix_space was not implemented, if this is an AbtractSparseCollection. Then the behaviour is expected.")
+        raise NotImplementedError("method get_sparce_matrix_space was not implemented, if this is an AbstractSparseCollection. Then the behaviour is expected.")
     
     def _get_matrix_estimations(self,
                                sampled_bow_list):
