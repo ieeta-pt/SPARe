@@ -6,12 +6,13 @@ def evaluate_spare(qrels, spare_result, question_ids):
     spare_result_ids = spare_result.ids#.tolist()
     spare_result_scores = spare_result.scores#.tolist()
     
-    max_at = 1000
+    # lets truncate to 1000 since the metrics are related to 1k
+    max_at = 1000 
     
     print("Converting to ranx format")
     for i in range(len(spare_result_ids)):
         scores = spare_result_scores[i]
-        for j in range(max_at):
+        for j in range(min(len(spare_result_scores[0]),max_at)):
             ranx_run[question_ids[i]][str(spare_result_ids[i][j])] = scores[j]
     
     
