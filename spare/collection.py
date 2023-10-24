@@ -96,7 +96,7 @@ class AbstractSparseCollection:
         sparse_collection = cls(index_reader.stats()["documents"], 
                                 vec_dim=index_reader.stats()["unique_terms"], 
                                 dtype=dtype, 
-                                weighting_schema=BM25WeightingSchema(k1=k1, b=b, k3=None, idf_weighting=idf_weighting),
+                                weighting_schema=BM25WeightingSchema(k1=k1, b=b, idf_weighting=None),
                                 backend=backend, 
                                 **kwargs)
         
