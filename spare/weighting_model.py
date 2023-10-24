@@ -61,7 +61,7 @@ class BM25WeightingSchema(WeightingSchema):
         return super()._get_vars_to_save() | {
             "k1": self.k1,
             "b": self.b,
-            "idf_weighting": idf_weighting
+            "idf_weighting": self.idf_weighting
             } 
     
     def _load_vars(self, data):

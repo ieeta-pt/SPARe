@@ -49,11 +49,10 @@ class SparseRetriever:
                                            return_scores=return_scores)
         
         # maybe convert index2docID if docID!=index
-        
         s_time = time.time()
         converted_indices = []
         for i in range(len(out.ids)):
-            q_indices = self.collection.metadata.index2docID[out.ids[i]]#[self.collection.metadata.index2docID[idx] for idx in out.ids[i]]
+            q_indices = self.collection.metadata.index2docID[out.ids[i]]
             converted_indices.append(q_indices)
         print("Time to convert docs ids",time.time()-s_time )
         out.ids = np.array(converted_indices)
