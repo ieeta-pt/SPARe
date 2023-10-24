@@ -1,5 +1,5 @@
 from spare import TYPE
-from spare.utils import get_coo_sparce_GB, get_csr_sparce_GB
+from spare.utils import get_coo_sparce_GB, get_csr_sparce_GB, load_backend, maybe_init
 from tqdm import tqdm
 from spare.metadata import MetaDataDFandDL
 import os
@@ -7,8 +7,11 @@ import jsonpickle
 import shutil
 from spare.weighting_model import WeightingSchemaType, CountingWeightingSchema, BM25WeightingSchema
 
-class SparseCollection:
-    ### implements a COO sparse matrix
+
+class AbtractSparseCollection:
+    """
+    A SparseCollection without a concrete implementation
+    """
     def __init__(self, 
                  collection_maxsize, 
                  text_to_vec=None,
@@ -19,7 +22,6 @@ class SparseCollection:
                  backend="torch") -> None:
         super().__init__()
 
-        
         self.collection_maxsize = collection_maxsize
                 
         if isinstance(dtype, int):  
@@ -35,14 +37,10 @@ class SparseCollection:
         else:
             self.vec_dim = vec_dim
         
-        if backend=="torch":
-            from spare.backend_torch import TorchBackend
-            self.backend = TorchBackend()
-        else:
-            RuntimeError("Only torch backend is currently supported")
+        self.backend = load_backend(backend)
         
-        self.metadata = metadata()
-        self.weighting_schema = weighting_schema()
+        self.metadata = maybe_init(metadata)
+        self.weighting_schema = maybe_init(weighting_schema)
             
     @classmethod
     def from_text_iterator(cls,
@@ -98,18 +96,14 @@ class SparseCollection:
         sparse_collection = cls(index_reader.stats()["documents"], 
                                 vec_dim=index_reader.stats()["unique_terms"], 
                                 dtype=dtype, 
-                                weighting_schema=BM25WeightingSchema,
+                                weighting_schema=BM25WeightingSchema(k1=k1, b=b, k3=None, idf_weighting=idf_weighting),
                                 backend=backend, 
                                 **kwargs)
         
         # probably can skip estimation
         sparse_collection._build_sparse_collection(bm25_pyserini_iterator(index_reader, k1=k1, b=b), 
                                                    max_files_for_estimation=max_files_for_estimation)
-        
-        sparse_collection.weighting_schema.k1 = k1
-        sparse_collection.weighting_schema.b = b
-        sparse_collection.weighting_schema.idf_weighting = None
-        
+                
         return sparse_collection
     
     def transform(self, transform_operator):
@@ -119,10 +113,10 @@ class SparseCollection:
             raise ValueError("Your current collection weighing schema or metadata is not compatible with the transformation asked.")
     
     def get_sparce_matrix(self):
-        return self.backend.create_coo_matrix(*self.sparse_vecs, self.shape)
+        raise NotImplementedError("method get_sparce_matrix was not implemented, if this is an AbtractSparseCollection. Then the behaviour is expected.")
     
     def _correct_transform_operator(self, transform_operator):
-        return transform_operator.for_coo()
+        raise NotImplementedError("method _correct_transform_operator was not implemented, if this is an AbtractSparseCollection. Then the behaviour is expected.")
     
     def _build_sparse_collection(self, iterator, max_files_for_estimation):
         
@@ -194,26 +188,10 @@ class SparseCollection:
         return self._slice_sparse_vecs(*sparse_vecs, element_index)
             
     def _slice_sparse_vecs(self, indices, values, element_index):
-        # if I slice the indices I will create a non-continguous vector... which is not good
-        #indices = self.backend.slice_tensor(indices, (slice(None, None, None), slice(None, element_index, None)))
-        #values = self.backend.slice_tensor(values, slice(None, element_index, None))
-        
-        # for the COO we will pad the documents to +1
-        doc_id = self.backend.get_value_from_tensor(indices, (0,element_index-1))+1
-        len_pad = values.shape[0]-element_index
-        self.backend.assign_data_to_tensor(indices,(0, slice(element_index, None, None)),[doc_id]*len_pad,TYPE.int64)
-        
-        # update shape to include the padded doc
-        self.shape = (self.shape[0]+1, self.shape[1])
-        self.metadata.update(doc_id, [], [0]) # pad the metadata
-        
-        return indices, values
-    
+        raise NotImplementedError("method _slice_sparse_vecs was not implemented, if this is an AbtractSparseCollection. Then the behaviour is expected.")
+ 
     def _init_sparse_vecs(self, elements_expected):
-        indices = self.backend.create_zero_tensor((2,elements_expected), TYPE.int64)
-        values = self.backend.create_zero_tensor((elements_expected,), self.dtype)
-        
-        return indices, values
+        raise NotImplementedError("method _init_sparse_vecs was not implemented, if this is an AbtractSparseCollection. Then the behaviour is expected.")
     
     def _sparcify_bow_and_meta_update(self, bow, index_docs):
         py_indices_row = []
@@ -229,22 +207,11 @@ class SparseCollection:
         return py_indices_row, py_indices_col, py_values
     
     def _update_sparse_vecs(self, indices, values, bow, element_index, index_docs):
-        
-        py_indices_row, py_indices_col, py_values = self._sparcify_bow_and_meta_update(bow, index_docs)
-        
-        self.backend.assign_data_to_tensor(indices, 
-                                           (slice(None, None, None), slice(element_index,element_index+len(py_indices_col), None)),
-                                           [py_indices_row, py_indices_col],
-                                           TYPE.int64)
-        self.backend.assign_data_to_tensor(values, 
-                                           slice(element_index,element_index+len(py_indices_col), None),
-                                           py_values,
-                                           self.dtype)
-            
-        return len(py_indices_col)
+        raise NotImplementedError("method _update_sparse_vecs was not implemented, if this is an AbtractSparseCollection. Then the behaviour is expected.")
+
     
     def get_sparce_matrix_space(self):
-        return get_coo_sparce_GB(self.shape, self.density, self.dtype)
+        raise NotImplementedError("method get_sparce_matrix_space was not implemented, if this is an AbtractSparseCollection. Then the behaviour is expected.")
     
     def _get_matrix_estimations(self,
                                sampled_bow_list):
@@ -299,8 +266,57 @@ class SparseCollection:
         sparse_collection.sparse_vecs = sparse_collection.backend.load_tensors_from_file(os.path.join(folder_name, "tensors.safetensors"))
         
         return sparse_collection
+
+class SparseCollectionCOO(AbstractSparseCollection):
+    
+    def get_sparce_matrix(self):
+        return self.backend.create_coo_matrix(*self.sparse_vecs, self.shape)
+    
+    def _correct_transform_operator(self, transform_operator):
+        return transform_operator.for_coo()
+    
+    def get_sparce_matrix_space(self):
+        return get_coo_sparce_GB(self.shape, self.density, self.dtype)
+    
+    def _init_sparse_vecs(self, elements_expected):
+
+        indices = self.backend.create_zero_tensor((2,elements_expected), TYPE.int64)
+        values = self.backend.create_zero_tensor((elements_expected,), self.dtype)
         
-class SparseCollectionCSR(SparseCollection):
+        return indices, values
+    
+    def _update_sparse_vecs(self, indices, values, bow, element_index, index_docs):
+        
+        py_indices_row, py_indices_col, py_values = self._sparcify_bow_and_meta_update(bow, index_docs)
+        
+        self.backend.assign_data_to_tensor(indices, 
+                                           (slice(None, None, None), slice(element_index,element_index+len(py_indices_col), None)),
+                                           [py_indices_row, py_indices_col],
+                                           TYPE.int64)
+        self.backend.assign_data_to_tensor(values, 
+                                           slice(element_index,element_index+len(py_indices_col), None),
+                                           py_values,
+                                           self.dtype)
+            
+        return len(py_indices_col)
+    
+    def _slice_sparse_vecs(self, indices, values, element_index):
+        # if I slice the indices I will create a non-continguous vector... which is not good
+        #indices = self.backend.slice_tensor(indices, (slice(None, None, None), slice(None, element_index, None)))
+        #values = self.backend.slice_tensor(values, slice(None, element_index, None))
+        
+        # for the COO we will pad the documents to +1
+        doc_id = self.backend.get_value_from_tensor(indices, (0,element_index-1))+1
+        len_pad = values.shape[0]-element_index
+        self.backend.assign_data_to_tensor(indices,(0, slice(element_index, None, None)),[doc_id]*len_pad,TYPE.int64)
+        
+        # update shape to include the padded doc
+        self.shape = (self.shape[0]+1, self.shape[1])
+        self.metadata.update(doc_id, [], [0]) # pad the metadata
+        
+        return indices, values
+        
+class SparseCollectionCSR(AbstractSparseCollection):
     # sparse collection imlemented with csr
     def __init__(self, 
                  *args,
@@ -310,12 +326,12 @@ class SparseCollectionCSR(SparseCollection):
         if isinstance(indices_dtype, int):  
             indices_dtype = TYPE(indices_dtype)
         self.indices_dtype = indices_dtype
-        
-    def _correct_transform_operator(self, transform_operator):
-        return transform_operator.for_csr()
     
     def get_sparce_matrix_space(self):
         return get_csr_sparce_GB(self.shape, self.density, self.dtype, self.indices_dtype)
+    
+    def _correct_transform_operator(self, transform_operator):
+        return transform_operator.for_csr()
     
     def get_sparce_matrix(self):
         return self.backend.create_csr_matrix(*self.sparse_vecs, self.shape, self.dtype)
@@ -361,3 +377,7 @@ class SparseCollectionCSR(SparseCollection):
     
     def _get_class_attributes(self):
         return super()._get_class_attributes() | {"indices_dtype":self.indices_dtype.value}
+
+
+# current default implementation
+SparseCollection = SparseCollectionCSR

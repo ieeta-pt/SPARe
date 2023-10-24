@@ -2,6 +2,21 @@ from spare import TYPE
 import math
 import numpy as np
 
+
+
+def maybe_init(class_or_insatnce):
+    if isinstance(class_or_insatnce, type):
+        return class_or_insatnce()
+    else:
+        return class_or_insatnce
+
+def load_backend(backend):
+    if backend=="torch":
+        from spare.backend_torch import TorchBackend
+        return TorchBackend()
+    else:
+        RuntimeError("Only torch backend is currently supported")
+
 def get_best_np_dtype_for(min_value, max_value):
     uint32_bounds = np.iinfo("uint32")
     uint64_bounds = np.iinfo("uint64")
