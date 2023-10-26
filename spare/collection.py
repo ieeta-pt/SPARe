@@ -1,5 +1,5 @@
 from spare import TYPE
-from spare.utils import get_coo_sparce_GB, get_csr_sparce_GB, load_backend, maybe_init
+from spare.utils import get_coo_sparse_GB, get_csr_sparse_GB, load_backend, maybe_init
 from tqdm import tqdm
 from spare.metadata import MetaDataDFandDL
 import os
@@ -105,15 +105,15 @@ class AbstractSparseCollection:
                                                    max_files_for_estimation=max_files_for_estimation)
                 
         return sparse_collection
-    
+        
     def transform(self, transform_operator):
         if transform_operator.is_compatible(self):
             self._correct_transform_operator(transform_operator).convert(self)
         else:
             raise ValueError("Your current collection weighing schema or metadata is not compatible with the transformation asked.")
     
-    def get_sparce_matrix(self):
-        raise NotImplementedError("method get_sparce_matrix was not implemented, if this is an AbstractSparseCollection. Then the behaviour is expected.")
+    def get_sparse_matrix(self):
+        raise NotImplementedError("method get_sparse_matrix was not implemented, if this is an AbstractSparseCollection. Then the behaviour is expected.")
     
     def _correct_transform_operator(self, transform_operator):
         raise NotImplementedError("method _correct_transform_operator was not implemented, if this is an AbstractSparseCollection. Then the behaviour is expected.")
@@ -129,9 +129,9 @@ class AbstractSparseCollection:
         
         shape, density = self._get_matrix_estimations(list_bow_for_estimation)
         self.shape = shape
-        self.density = density 
+        self.density_estimation = density 
         
-        mem_needed = self.get_sparce_matrix_space()
+        mem_needed = self.get_sparse_matrix_space()
         
         elements_expected = int(shape[0] * shape[1] * density)
         print(f"We estimate that the collection matrix will have density of {density:.4f}, which requires {mem_needed} GB. Plus 0.5GB for overheads.")
@@ -145,8 +145,8 @@ class AbstractSparseCollection:
         
         # lets optimize the metadata
         self.metadata.optimize()
-        
     
+
     def _build_sparse_tensor(self, iterator, collection_maxsize, elements_expected, list_bow_for_estimation):
         
         sparse_vecs = self._init_sparse_vecs(elements_expected)
@@ -185,6 +185,9 @@ class AbstractSparseCollection:
         
         self.nnz = element_index
         
+        # compute the exact density
+        self.density = self.nnz/(self.shape[0]*self.shape[1])
+        
         return self._slice_sparse_vecs(*sparse_vecs, element_index)
             
     def _slice_sparse_vecs(self, indices, values, element_index):
@@ -196,9 +199,17 @@ class AbstractSparseCollection:
     def _update_sparse_vecs(self, indices, values, bow, element_index, index_docs):
         raise NotImplementedError("method _update_sparse_vecs was not implemented, if this is an AbstractSparseCollection. Then the behaviour is expected.")
 
+    def get_sparse_matrix_space(self):
+        
+        if hasattr(self, "density"):
+            density = self.density
+        else:
+            density = self.density_estimation
+
+        return self._compute_space_in_GB(self.shape, density, self.dtype)
     
-    def get_sparce_matrix_space(self):
-        raise NotImplementedError("method get_sparce_matrix_space was not implemented, if this is an AbstractSparseCollection. Then the behaviour is expected.")
+    def _compute_space_in_GB(self):
+        raise NotImplementedError("method _compute_space_in_GB was not implemented, if this is an AbstractSparseCollection. Then the behaviour is expected.")
     
     def _get_matrix_estimations(self,
                                sampled_bow_list):
@@ -214,6 +225,7 @@ class AbstractSparseCollection:
     def _get_class_attributes(self):
         return {"nnz": self.nnz,
                       "shape": self.shape,
+                      "density": self.density,
                       "collection_maxsize": self.collection_maxsize,
                       "dtype": self.dtype.value,
                       "vec_dim": self.vec_dim,
@@ -242,10 +254,13 @@ class AbstractSparseCollection:
             
         nnz = class_vars.pop("nnz")
         shape = tuple(class_vars.pop("shape"))
+        # TODO BACKWARD COMPATIBILITY_ remove the default value when new indexes are built
+        density = class_vars.pop("density", nnz/(shape[0]*shape[1]))
         
         sparse_collection = cls(**class_vars, backend=backend)
         sparse_collection.nnz = nnz
         sparse_collection.shape = shape
+        sparse_collection.density = density 
         
         sparse_collection.metadata.load_from_file(os.path.join(folder_name, "metadata.p"))
         sparse_collection.weighting_schema.load_from_file(os.path.join(folder_name, "weight_schema.jsonpickle"))
@@ -256,14 +271,14 @@ class AbstractSparseCollection:
 
 class SparseCollectionCOO(AbstractSparseCollection):
     
-    def get_sparce_matrix(self):
+    def get_sparse_matrix(self):
         return self.backend.create_coo_matrix(*self.sparse_vecs, self.shape)
     
     def _correct_transform_operator(self, transform_operator):
         return transform_operator.for_coo()
     
-    def get_sparce_matrix_space(self):
-        return get_coo_sparce_GB(self.shape, self.density, self.dtype)
+    def _compute_space_in_GB(self, shape, density, dtype):
+        return get_coo_sparse_GB(shape, density, dtype)
     
     def _init_sparse_vecs(self, elements_expected):
 
@@ -327,13 +342,13 @@ class SparseCollectionCSR(SparseCollectionCOO):
             indices_dtype = TYPE(indices_dtype)
         self.indices_dtype = indices_dtype
     
-    def get_sparce_matrix_space(self):
-        return get_csr_sparce_GB(self.shape, self.density, self.dtype, self.indices_dtype)
+    def _compute_space_in_GB(self, shape, density, dtype):
+        return get_csr_sparse_GB(shape, density, dtype=dtype, indices_dtype=self.indices_dtype)
     
     def _correct_transform_operator(self, transform_operator):
         return transform_operator.for_csr()
     
-    def get_sparce_matrix(self):
+    def get_sparse_matrix(self):
         return self.backend.create_csr_matrix(*self.sparse_vecs, self.shape, self.dtype)
     
     def _init_sparse_vecs(self, elements_expected):
