@@ -253,6 +253,7 @@ class ShardedCSRSparseRetrievalModel(torch.nn.Module):
         self.shape = sparse_collection.shape
         self.top_k = top_k
         
+        # caching of the current shard in mem
         self._shard_current_index = -1
         self._shard_collection_matrix = None
         self._shard_start_row = -1
@@ -382,9 +383,10 @@ class QuestionDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         b = self.bow(self.questions[idx])
-        indices = torch.tensor(list(b.keys()))
+        #indices = torch.tensor(list(b.keys()))
         # TODO fix I need to use the same dtype of the collection
-        values = torch.tensor(list(b.values()))
+        #values = torch.tensor(list(b.values()))
+        indices,  values = map(torch.tensor, zip(*b.items()))
         
         return indices, values#{"indices": indices, "values": values}
     
@@ -393,9 +395,9 @@ class DistributedQuestionDataset(QuestionDataset):
 
     def __getitem__(self, idx):
         b = self.bow(self.questions[idx])
-        indices = list(b.keys())
-        values = list(b.values())
-        
+        indices,  values = zip(*b.items())
+        #indices = list(b.keys())
+        #values = list(b.values())
         return indices, values
     
 def distributed_collate_fn(data):
