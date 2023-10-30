@@ -169,7 +169,7 @@ class TorchBackend(AbstractBackend):
         
         return RetrievalOutput(ids=indices_cpu, scores=values_cpu, timmings=(len(questions_dataset)/(end_retrieval_time-start_retrieval_time), men_t_e-mem_t_s))
     
-def sharding_retrieval(self, questions_list, question_func, collection, top_k, shards_count, collect_at, profiling, return_scores):
+    def sharding_retrieval(self, questions_list, question_func, collection, top_k, shards_count, collect_at, profiling, return_scores):
         
         sparse_model= ShardedCSRSparseRetrievalModel(collection, top_k=top_k, splits_count=shards_count).to(self.devices[0])
         questions_dataset = QuestionDataset(questions_list, question_func, collection.shape[-1])
@@ -327,6 +327,9 @@ class ShardedCSRSparseRetrievalModel(torch.nn.Module):
     
     def shard_forward(self, query, shard_index):
         if self._shard_current_index!=shard_index:
+            
+            del self._shard_collection_matrix
+            
             crow, cindices, cvalues, start_row, end_row = self.splits[shard_index]
             crow = crow.to(self._device)
             cindices = cindices.to(self._device)

@@ -45,14 +45,15 @@ class SparseRetriever:
             return self.weighting_model.transform_query(self.bow(query))
         
         # leave 20‰ free for the reminder of the computations
-        mem_required = self.collection.get_sparse_matrix_space() * 0.2
-        
+        mem_required = self.collection.get_sparse_matrix_space() * 1.2
+        print(f"Memory required to for the retrieval: {mem_required:.3f} GB", )
         if self.backend.num_devices>1:
             # lets take advantage of multi devices
             
             # add (10% TODO find best value for bottlenecks) for bottlenecks
             
             if mem_required < self.backend.get_available_memory_per_device_inGB():
+                print("Running on DataParallel mode")
                 out = self.backend.dp_retrieval(questions_list, 
                                             query_transform,
                                             self.collection, 
@@ -65,6 +66,7 @@ class SparseRetriever:
             
         else:
             if mem_required < self.backend.get_available_memory_per_device_inGB():
+                print("Running on Forward mode")
                 out = self.backend.forward_retrieval(questions_list, 
                                                 query_transform,
                                                 self.collection, 
@@ -73,9 +75,10 @@ class SparseRetriever:
                                                 profiling=profiling,
                                                 return_scores=return_scores)
             else:
-                
+                print("Running on Sharding mode:")
                 shards_count = math.ceil(mem_required/self.backend.get_available_memory_per_device_inGB())
-                
+                #print("Mem req", mem_required, "Available per device", self.backend.get_available_memory_per_device_inGB(), mem_required/self.backend.get_available_memory_per_device_inGB())
+                print("Num of shards:", shards_count)
                 out = self.backend.sharding_retrieval(questions_list, 
                                                 query_transform,
                                                 self.collection, 
