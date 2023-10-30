@@ -2,7 +2,6 @@
 from enum import Enum
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List
 
 @dataclass
 class RetrievalOutput:
@@ -20,12 +19,8 @@ class Singleton(type):
 
 class AbstractBackend(metaclass=Singleton):
     
-    def __init__(self, devices: List):
+    def __init__(self, devices):
         self.devices=devices
-        self.num_devices=len(self.devices)
-    
-    def get_available_memory_per_device(self):
-        raise NotImplementedError
     
     def create_zero_tensor(self, shape, dtype):
         raise NotImplementedError

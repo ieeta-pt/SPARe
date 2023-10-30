@@ -54,7 +54,7 @@ class BM25WeightingSchema(WeightingSchema):
         self.idf_weighting = idf_weighting
     
     def get_weighting_model(self):
-        return BM25WeightingModel(k1=self.k1, b=self.b, idf_weighting=self.idf_weighting)
+        raise BM25WeightingModel(k1=self.k1, b=self.b, idf_weighting=self.idf_weighting)
     
     
     def _get_vars_to_save(self):
