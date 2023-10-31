@@ -148,6 +148,9 @@ class TorchBackend(AbstractBackend):
     def preprare_for_forward_retrieval(self, collection):
         return CSRSparseRetrievalModel(collection).to(self.devices[0]), QuestionDataset
     
+    def preprare_for_forward_retrieval_iterative(self, collection, objective):
+        return CSRSparseRetrievalModelIterative(collection, objective=objective).to(self.devices[0]), QuestionDataset
+        
     def forward_retrieval(self, sparse_model, dataset_class, questions_list, question_func, top_k, collect_at, profiling, return_scores):
 
         sparse_model.top_k = top_k
@@ -241,7 +244,7 @@ class CSRSparseRetrievalModel(torch.nn.Module):
     
         return torch.topk(collection_matrix @ query, k=self.top_k, dim=0)
         #return x
-
+        
 class CSRSparseRetrievalDistributedModel(CSRSparseRetrievalModel):
         
     def forward(self, indices, values, size):
@@ -253,7 +256,50 @@ class CSRSparseRetrievalDistributedModel(CSRSparseRetrievalModel):
         return torch.topk(collection_matrix @ query, k=self.top_k, dim=0)
         #return x
         
+class CSRSparseRetrievalModelIterative(torch.nn.Module):
+    def __init__(self, sparse_collection, top_k=10, objective="accuracy"):
+        super().__init__()
+        if objective=="accuracy":
+            self.storage_dtype = torch.float16
+        elif objective=="performance":
+            self.storage_dtype = torch.uint8
+        else:
+            raise RuntimeError(f"Objective mode {objective} is not supported in class CSRSparseRetrievalModelIterative")
 
+        #print("DEBUG: DATA TYPE", self.storage_dtype)
+        
+        print("Torch convert tensors from CSR to CSC")
+        csc_tensor = torch.sparse_csr_tensor(*sparse_collection.sparse_vecs, sparse_collection.shape).to_sparse_csc()
+
+        self.ccol = csc_tensor.ccol_indices()
+        self.rindices = csc_tensor.row_indices()
+        self.cvalues = csc_tensor.values()
+        
+        self.top_k = top_k
+        self.shape = sparse_collection.shape
+        
+    def to(self, device):
+        self._device = device
+        self.ccol = self.ccol.to(device)
+        self.rindices = self.rindices.to(device)
+        self.cvalues = self.cvalues.to(device)
+        return super().to(device)
+    
+    def forward(self, indices, values):
+        
+        indices = indices.squeeze(0)
+        values = values.squeeze(0)
+        
+        accumulated = torch.zeros(self.shape[0], dtype=self.storage_dtype).to(self._device)
+        
+        for i, (strat_idx, end_idx) in enumerate(zip(self.ccol[indices], self.ccol[indices+1])):
+            v_indices = self.rindices[strat_idx: end_idx]
+            
+            v_values = (self.cvalues[strat_idx: end_idx] * values[i] + 0.5).type(self.storage_dtype)
+
+            accumulated.index_add_(0, v_indices, v_values)
+            
+        return torch.topk(accumulated, k=10, dim=0)
 
 class ShardedCSRSparseRetrievalModel(torch.nn.Module):
     def __init__(self, sparse_collection, top_k=10, splits_count=1):
