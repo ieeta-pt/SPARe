@@ -6,6 +6,7 @@ from safetensors import safe_open
 from tqdm import tqdm
 import time
 import numpy as np
+import psutil
 
 class TorchBackend(AbstractBackend):
     
@@ -22,6 +23,7 @@ class TorchBackend(AbstractBackend):
             TYPE.int64: torch.int64,
             TYPE.float32: torch.float32,
             TYPE.float16: torch.float16,
+            TYPE.uint8: torch.uint8,
         }
     
     def assign_data_to_tensor(self, tensor, indices_slices, values, dtype):
@@ -75,12 +77,18 @@ class TorchBackend(AbstractBackend):
         return tensor.type(self.types_converter[dtype])
     
     def get_available_memory_per_device_inGB(self):
-        return torch.cuda.mem_get_info(0)[0] * 1e-9   
+        if torch.cuda.is_available():
+            return torch.cuda.mem_get_info(0)[0] * 1e-9
+        else:
+            return psutil.virtual_memory().available/(1024**3)
     
-    def dp_retrieval(self, questions_list, question_func, collection, top_k, collect_at, profiling, return_scores):
+    def preprare_for_dp_retrieval(self, collection):
+        return CSRSparseRetrievalDistributedModel(collection).to(self.devices[0]), DistributedQuestionDataset
+
+    def dp_retrieval(self, sparse_model, dataset_class, questions_list, question_func, top_k, collect_at, profiling, return_scores):
         
-        sparse_model= CSRSparseRetrievalDistributedModel(collection, top_k=top_k).to(self.devices[0])
-        questions_dataset = DistributedQuestionDataset(questions_list, question_func, collection.shape[-1])
+        sparse_model.top_k = top_k
+        questions_dataset = dataset_class(questions_list, question_func, sparse_model.shape[-1])
         
         dl = torch.utils.data.DataLoader(questions_dataset, 
                                          batch_size=len(self.devices), 
@@ -136,11 +144,14 @@ class TorchBackend(AbstractBackend):
         #    values_cpu = torch.concat(values_cpu, axis=0)
         # concat is slow
         return RetrievalOutput(ids=indices_cpu, scores=np.array(values_cpu), timmings=(len(questions_dataset)/(end_retrieval_time-start_retrieval_time), men_t_e-mem_t_s))
-        
-    def forward_retrieval(self, questions_list, question_func, collection, top_k, collect_at, profiling, return_scores):
-        
-        sparse_model= CSRSparseRetrievalModel(collection, top_k=top_k).to(self.devices[0])
-        questions_dataset = QuestionDataset(questions_list, question_func, collection.shape[-1])
+    
+    def preprare_for_forward_retrieval(self, collection):
+        return CSRSparseRetrievalModel(collection).to(self.devices[0]), QuestionDataset
+    
+    def forward_retrieval(self, sparse_model, dataset_class, questions_list, question_func, top_k, collect_at, profiling, return_scores):
+
+        sparse_model.top_k = top_k
+        questions_dataset = dataset_class(questions_list, question_func, sparse_model.shape[-1])
         
         dl = torch.utils.data.DataLoader(questions_dataset, 
                                             batch_size=len(self.devices), 
@@ -169,10 +180,13 @@ class TorchBackend(AbstractBackend):
         
         return RetrievalOutput(ids=indices_cpu, scores=values_cpu, timmings=(len(questions_dataset)/(end_retrieval_time-start_retrieval_time), men_t_e-mem_t_s))
     
-    def sharding_retrieval(self, questions_list, question_func, collection, top_k, shards_count, collect_at, profiling, return_scores):
-        
-        sparse_model= ShardedCSRSparseRetrievalModel(collection, top_k=top_k, splits_count=shards_count).to(self.devices[0])
-        questions_dataset = QuestionDataset(questions_list, question_func, collection.shape[-1])
+    def preprare_for_sharding_retrieval(self, collection, shards_count):
+        return CSRSparseRetrievalModel(collection, splits_count=shards_count).to(self.devices[0]), QuestionDataset
+    
+    def sharding_retrieval(self, sparse_model, dataset_class, questions_list, question_func, top_k, collect_at, profiling, return_scores):
+
+        sparse_model.top_k = top_k
+        questions_dataset = dataset_class(questions_list, question_func, sparse_model.shape[-1])
         
         dl = torch.utils.data.DataLoader(questions_dataset, 
                                             batch_size=len(self.devices), 
@@ -184,7 +198,7 @@ class TorchBackend(AbstractBackend):
 
         for shard_index in range(sparse_model.num_shards):
 
-            for q_index, (indices, values) in enumerate(tqdm(dl, desc=f"Retrieve shard {shard_index}/{sparse_model.num_shards}")):
+            for q_index, (indices, values) in enumerate(tqdm(dl, desc=f"Retrieve shard {shard_index}/{sparse_model.num_shards-1}")):
 
                 query = sparse_model.build_dense_query(indices, values)
                 
@@ -395,12 +409,13 @@ class DistributedQuestionDataset(QuestionDataset):
 
     def __getitem__(self, idx):
         b = self.bow(self.questions[idx])
-        indices,  values = zip(*b.items())
+        indices,  values = map(list, zip(*b.items()))
         #indices = list(b.keys())
         #values = list(b.values())
         return indices, values
     
 def distributed_collate_fn(data):
+    #print(data)
     max_len = max([len(x[0]) for x in data])
     indices = []
     values = []
