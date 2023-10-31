@@ -7,6 +7,8 @@ from tqdm import tqdm
 import time
 import numpy as np
 import psutil
+import gc
+
 
 class TorchBackend(AbstractBackend):
     
@@ -85,6 +87,9 @@ class TorchBackend(AbstractBackend):
     def preprare_for_dp_retrieval(self, collection):
         return CSRSparseRetrievalDistributedModel(collection).to(self.devices[0]), DistributedQuestionDataset
 
+    def preprare_for_dp_retrieval_iterative(self, collection, objective):
+        return CSRSparseRetrievalDistributedModelIterative(collection, objective=objective).to(self.devices[0]), DistributedQuestionDataset
+    
     def dp_retrieval(self, sparse_model, dataset_class, questions_list, question_func, top_k, collect_at, profiling, return_scores):
         
         sparse_model.top_k = top_k
@@ -186,6 +191,9 @@ class TorchBackend(AbstractBackend):
     def preprare_for_sharding_retrieval(self, collection, shards_count):
         return CSRSparseRetrievalModel(collection, splits_count=shards_count).to(self.devices[0]), QuestionDataset
     
+    def preprare_for_sharding_retrieval_iterative(self, collection, shards_count, objective):
+        return ShardedCSRSparseRetrievalModelIterative(collection, splits_count=shards_count, objective=objective).to(self.devices[0]), QuestionDataset
+    
     def sharding_retrieval(self, sparse_model, dataset_class, questions_list, question_func, top_k, collect_at, profiling, return_scores):
 
         sparse_model.top_k = top_k
@@ -271,35 +279,58 @@ class CSRSparseRetrievalModelIterative(torch.nn.Module):
         print("Torch convert tensors from CSR to CSC")
         csc_tensor = torch.sparse_csr_tensor(*sparse_collection.sparse_vecs, sparse_collection.shape).to_sparse_csc()
 
-        self.ccol = csc_tensor.ccol_indices()
-        self.rindices = csc_tensor.row_indices()
-        self.cvalues = csc_tensor.values()
+        self.ccol = torch.nn.parameter.Parameter(csc_tensor.ccol_indices(), requires_grad=False)
+        self.rindices = torch.nn.parameter.Parameter(csc_tensor.row_indices(), requires_grad=False)
+        self.cvalues = torch.nn.parameter.Parameter(csc_tensor.values(), requires_grad=False)
         
         self.top_k = top_k
         self.shape = sparse_collection.shape
         
-    def to(self, device):
-        self._device = device
-        self.ccol = self.ccol.to(device)
-        self.rindices = self.rindices.to(device)
-        self.cvalues = self.cvalues.to(device)
-        return super().to(device)
+    #def to(self, device):
+    #    self._device = device
+    #    self.ccol = self.ccol.to(device)
+    #    self.rindices = self.rindices.to(device)
+    #    self.cvalues = self.cvalues.to(device)
+    #    return super().to(device)
     
     def forward(self, indices, values):
         
         indices = indices.squeeze(0)
         values = values.squeeze(0)
         
-        accumulated = torch.zeros(self.shape[0], dtype=self.storage_dtype).to(self._device)
+        #accumulated = torch.zeros(self.shape[0], dtype=self.storage_dtype).to(indices.device)
+    
+        #start_positions = self.ccol[indices]
+        #end_positions = self.ccol[indices+1]
+
+        #ranges = [torch.arange(s, e, device=indices.device, dtype=torch.int32) for s, e in zip(start_positions, end_positions)]
+            
+        #index_tensor = torch.cat(ranges)
+        
+        #v_indices = self.rindices.index_select(0, index_tensor)
+        #v_values = self.cvalues.index_select(0, index_tensor).type(self.storage_dtype)
+
+        #accumulated.index_add_(0, v_indices, v_values)
+
+        #return torch.topk(accumulated, 10)
+        
+        accumulated = torch.zeros(self.shape[0], dtype=self.storage_dtype).to(indices.device)
         
         for i, (strat_idx, end_idx) in enumerate(zip(self.ccol[indices], self.ccol[indices+1])):
             v_indices = self.rindices[strat_idx: end_idx]
             
-            v_values = (self.cvalues[strat_idx: end_idx] * values[i] + 0.5).type(self.storage_dtype)
+            # 0.5 is to help to round the values when converting from float32 to uint8
+            v_values = (self.cvalues[strat_idx: end_idx] * values[i]).type(self.storage_dtype)
 
             accumulated.index_add_(0, v_indices, v_values)
             
-        return torch.topk(accumulated, k=10, dim=0)
+        return torch.topk(accumulated, k=self.top_k, dim=0)
+    
+class CSRSparseRetrievalDistributedModelIterative(CSRSparseRetrievalModelIterative):
+        
+    def forward(self, indices, values, size):
+        return super().forward(indices[0, :size].unsqueeze(0), values[0,:size].unsqueeze(0))
+
 
 class ShardedCSRSparseRetrievalModel(torch.nn.Module):
     def __init__(self, sparse_collection, top_k=10, splits_count=1):
@@ -317,6 +348,11 @@ class ShardedCSRSparseRetrievalModel(torch.nn.Module):
         self._shard_current_index = -1
         self._shard_collection_matrix = None
         self._shard_start_row = -1
+        
+        del crow
+        del indices
+        del values
+        del sparse_collection.sparse_vecs
         
     def to(self, device):
         self._device = device
@@ -431,6 +467,81 @@ class ShardedCSRSparseRetrievalModel(torch.nn.Module):
         
         #print("Time to compute all shards",shards_e_t-shards_s_t, "time to merge",merged_e_t-shards_e_t)
         return merged
+
+class ShardedCSRSparseRetrievalModelIterative(ShardedCSRSparseRetrievalModel):
+    def __init__(self, sparse_collection, top_k=10, splits_count=1, objective="accuracy"):
+        super().__init__(sparse_collection=sparse_collection, top_k=top_k, splits_count=splits_count)
+        
+        if objective=="accuracy":
+            self.storage_dtype = torch.float16
+        elif objective=="performance":
+            self.storage_dtype = torch.uint8
+        else:
+            raise RuntimeError(f"Objective mode {objective} is not supported in class CSRSparseRetrievalModelIterative")
+
+        print("Convert splits to CSR to CSC")
+        for i in range(len(self.splits)):
+            crow, cindices, cvalues, start_row, end_row = self.splits[i]
+            self.splits[i] = None
+            print("Torch convert tensors from CSR to CSC")
+            csc_tensor = torch.sparse_csr_tensor(crow, cindices, cvalues, sparse_collection.shape).to_sparse_csc()
+
+            csc_ccol = csc_tensor.ccol_indices()
+            csc_rindices = csc_tensor.row_indices()
+            csc_cvalues = csc_tensor.values()
+            del csc_tensor
+            del crow
+            del cindices
+            del cvalues
+            
+            self.splits[i] = (csc_ccol, csc_rindices, csc_cvalues, start_row, end_row)
+            gc.collect()
+    
+    def build_dense_query(self, indices, values):
+        indices = indices.squeeze(0).to(self._device)
+        values = values.squeeze(0).to(self._device)
+        
+        return indices, values
+     
+    def shard_forward(self, query, shard_index):
+        if self._shard_current_index!=shard_index:
+            
+            del self._shard_collection_matrix
+            
+            ccol, rindices, cvalues, start_row, end_row = self.splits[shard_index]
+            ccol = ccol.to(self._device)
+            rindices = rindices.to(self._device)
+            cvalues = cvalues.to(self._device)
+            
+            collection_matrix = (ccol, rindices, cvalues)
+            
+            self._shard_current_index=shard_index
+            self._shard_collection_matrix = collection_matrix
+            self._shard_start_row = start_row
+        else:
+            ccol, rindices, cvalues = collection_matrix
+        
+        indices, values = query
+        
+        accumulated = torch.zeros(self.shape[0], dtype=self.storage_dtype).to(self._device)
+        
+        for i, (strat_idx, end_idx) in enumerate(zip(ccol[indices], ccol[indices+1])):
+            v_indices = rindices[strat_idx: end_idx]
+            
+            # 0.5 is to help to round the values when converting from float32 to uint8
+            v_values = (cvalues[strat_idx: end_idx] * values[i] + 0.5).type(self.storage_dtype)
+
+            accumulated.index_add_(0, v_indices, v_values)
+            
+        local_scores, local_indices = torch.topk(accumulated, k=self.top_k, dim=0)
+        
+        del accumulated
+        #del collection_matrix
+        #del crow
+        #del cindices
+        #del cvalues
+        
+        return (local_scores, local_indices+self._shard_start_row)
 
 class QuestionDataset(torch.utils.data.Dataset):
     def __init__(self, questions, bow, vocab_size):

@@ -29,35 +29,42 @@ def build_running_plan(backend, collection, objective="performance", algorithm="
     if backend.num_devices>1:
         if mem_required < available_memory_per_device:
             running_mode_str = "DataParallel"
+            running_func = backend.dp_retrieval
             if algorithm=="dot":
                 algorithm_str = "dot product"
                 pre_init_modules = backend.preprare_for_dp_retrieval(collection)
-                running_func = backend.dp_retrieval
+            elif algorithm=="iterative":
+                algorithm_str = "iterative product"
+                pre_init_modules = backend.preprare_for_dp_retrieval_iterative(collection, objective)
             else:
-                raise NotImplementedError("DataParallel is currently only implemented for dot algorithm")
+                raise NotImplementedError("DataParallel is currently only implemented for dot and iterative algorithms")  
         else:
             raise NotImplementedError("Tensor parallelism is currently not supported in SPARe")
         
     else:
         if mem_required < available_memory_per_device:
             running_mode_str = "Single forward"
+            running_func = backend.forward_retrieval
             if algorithm=="dot":
                 algorithm_str = "dot product"
                 pre_init_modules = backend.preprare_for_forward_retrieval(collection)
-                running_func = backend.forward_retrieval
             elif algorithm=="iterative":
                 algorithm_str = "iterative product"
                 pre_init_modules = backend.preprare_for_forward_retrieval_iterative(collection, objective)
-                running_func = backend.forward_retrieval
             else:
                 raise NotImplementedError("Single forward is currently only implemented for dot and iterative algorithms")
         else:
             shards_count = math.ceil(mem_required/backend.get_available_memory_per_device_inGB())
-            
             running_mode_str = "Sharding"
-            algorithm = "dot product"
-            pre_init_modules = backend.preprare_for_sharding_retrieval(collection, shards_count)
             running_func = backend.sharding_retrieval
+            if algorithm=="dot":
+                algorithm_str = "dot product"
+                pre_init_modules = backend.preprare_for_sharding_retrieval(collection, shards_count=shards_count)
+            elif algorithm=="iterative":
+                algorithm_str = "iterative product"
+                pre_init_modules = backend.preprare_for_sharding_retrieval_iterative(collection, shards_count=shards_count, objective=objective)
+            else:
+                raise NotImplementedError("Sharding is currently only implemented for dot and iterative algorithms")
 
     # print current config
     print()
