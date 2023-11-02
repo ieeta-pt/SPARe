@@ -28,14 +28,16 @@ def build_running_plan(backend, collection, objective="performance", algorithm="
     
     if backend.num_devices>1:
         if mem_required < available_memory_per_device:
-            running_mode_str = "DataParallel"
-            running_func = backend.dp_retrieval
             if algorithm=="dot":
                 algorithm_str = "dot product"
+                running_mode_str = "DataParallel"
                 pre_init_modules = backend.preprare_for_dp_retrieval(collection)
+                running_func = backend.dp_retrieval
             elif algorithm=="iterative":
+                running_mode_str = "DataParallel with Threading"
                 algorithm_str = "iterative product"
                 pre_init_modules = backend.preprare_for_dp_retrieval_iterative(collection, objective)
+                running_func = backend.dp_retrieval_iterative
             else:
                 raise NotImplementedError("DataParallel is currently only implemented for dot and iterative algorithms")  
         else:
