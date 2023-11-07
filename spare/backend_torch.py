@@ -39,7 +39,7 @@ def thread_inference_loop(sparse_model, top_k, device, question_dataset_class, d
     men_t_e = time.time()
     #print("Mem transference time:", men_t_e-mem_t_s)
     
-    return RetrievalOutput(ids=indices_cpu, scores=values_cpu, timmings=(len(questions_dataset)/(end_retrieval_time-start_retrieval_time), men_t_e-mem_t_s))
+    return rank,RetrievalOutput(ids=indices_cpu, scores=values_cpu, timmings=(len(questions_dataset)/(end_retrieval_time-start_retrieval_time), men_t_e-mem_t_s))
 
 
 class TorchBackend(AbstractBackend):
@@ -144,18 +144,19 @@ class TorchBackend(AbstractBackend):
 
         question_chunks = [questions_list[i:i + chunk_size] for i in range(0, len(questions_list), chunk_size)]
         
-        ids = []
-        scores = []
-        timings = []
+        ids = [None] * len(self.devices)
+        scores = [None] * len(self.devices)
+        timings = [None] * len(self.devices)
+        
         with concurrent.futures.ThreadPoolExecutor(max_workers=num_devices) as executor:
             futures = [executor.submit(thread_inference_loop, sparse_models[device], top_k, device, dataset_class, data_chunk, question_func, _id)
                     for _id, (device, data_chunk) in enumerate(zip(self.devices, question_chunks))]
 
             for future in concurrent.futures.as_completed(futures):
-                out = future.result()
-                ids.append(out.ids)
-                scores.append(out.scores)
-                timings.append(out.timmings)
+                _id, out = future.result()
+                ids[_id] = out.ids
+                scores[_id] = out.scores
+                timings[_id] = out.timmings 
             
         return RetrievalOutput(ids=torch.cat(ids, dim=0), 
                             scores=torch.cat(scores, dim=0),
