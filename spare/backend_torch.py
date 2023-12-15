@@ -335,7 +335,7 @@ class CSRSparseRetrievalDistributedModel(CSRSparseRetrievalModel):
         query = torch.sparse_coo_tensor(indices[0, :size].unsqueeze(0), values[0,:size], (self.shape[-1],), dtype=self.values.dtype).to_dense()
         #print(x.shape)
         collection_matrix = torch.sparse_csr_tensor(self.crow, self.indice, self.values, self.shape, dtype=self.values.dtype)
-    
+                
         return torch.topk(collection_matrix @ query, k=self.top_k, dim=0)
         #return x
 
@@ -352,6 +352,8 @@ class CSRSparseRetrievalModelIterativeThreadSafe(torch.nn.Module):
         super().__init__()
         
         if objective=="accuracy":
+            self.storage_dtype = torch.float32
+        elif objective=="half":
             self.storage_dtype = torch.float16
         elif objective=="performance":
             self.storage_dtype = torch.uint8
@@ -394,6 +396,8 @@ class CSRSparseRetrievalModelIterative(torch.nn.Module):
     def __init__(self, sparse_collection, top_k=10, objective="accuracy"):
         super().__init__()
         if objective=="accuracy":
+            self.storage_dtype = torch.float32
+        elif objective=="half":
             self.storage_dtype = torch.float16
         elif objective=="performance":
             self.storage_dtype = torch.uint8
@@ -599,6 +603,8 @@ class ShardedCSRSparseRetrievalModelIterative(ShardedCSRSparseRetrievalModel):
         super().__init__(sparse_collection=sparse_collection, top_k=top_k, splits_count=splits_count)
         
         if objective=="accuracy":
+            self.storage_dtype = torch.float32
+        elif objective=="half":
             self.storage_dtype = torch.float16
         elif objective=="performance":
             self.storage_dtype = torch.uint8
@@ -678,13 +684,18 @@ class QuestionDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.questions)
 
+    
     def __getitem__(self, idx):
         b = self.bow(self.questions[idx])
         #indices = torch.tensor(list(b.keys()))
         # TODO fix I need to use the same dtype of the collection
         #values = torch.tensor(list(b.values()))
-        indices,  values = map(torch.tensor, zip(*b.items()))
         
+        if len(b)>0:
+            indices,  values = map(torch.tensor, zip(*b.items()))
+        else:
+            indices, values = torch.tensor([], dtype=torch.int32), torch.tensor([], dtype=torch.int32)
+
         return indices, values#{"indices": indices, "values": values}
     
     
@@ -692,7 +703,11 @@ class DistributedQuestionDataset(QuestionDataset):
 
     def __getitem__(self, idx):
         b = self.bow(self.questions[idx])
-        indices,  values = map(list, zip(*b.items()))
+        
+        if len(b)>0:
+            indices,  values = map(list, zip(*b.items()))
+        else:
+            indices, values = [],[]
         #indices = list(b.keys())
         #values = list(b.values())
         return indices, values
