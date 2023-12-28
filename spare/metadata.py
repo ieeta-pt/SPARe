@@ -13,6 +13,9 @@ class MetaDataDocID:
         assert(index == len(self.index2docID))
         self.index2docID.append(docID)
 
+    def update(self, index_doc, term_ids, values):
+        pass
+    
     def optimize(self):
         # convert to np array
         try:
