@@ -101,5 +101,12 @@ def main(dataset_folder, at, cache_bow, fp_16, objective, algorithm):
         print("Total retrieve time", (e-s), "QPS", len(questions)/(e-s))
         fOut.write(f"{dataset_folder},{at},{len(questions)/(e-s)},{r_evaluate['ndcg@10']},{r_evaluate['ndcg@1000']},{r_evaluate['recall@1000']},{times[0]},{times[1]}\n")
     
+    if r_evaluate['ndcg@10'] < 0.01:
+        print("write bug")
+        
+        import pickle 
+        with open("bug_singl_gpu.pickcle", "wb") as f:
+            pickle.dump(out, f)
+    
 if __name__=="__main__":
     main()

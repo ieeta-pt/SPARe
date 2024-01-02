@@ -22,8 +22,10 @@ from evaluate import evaluate_spare
 @click.argument("at", type=int)
 @click.option("--cache_bow", is_flag=True)
 @click.option("--fp_16", is_flag=True)
-def main(dataset_folder, at, cache_bow, fp_16):
-    notes = ""
+@click.option("--objective", default="accuracy")
+@click.option("--algorithm", default="dot")
+def main(dataset_folder, at, cache_bow, fp_16, objective, algorithm):
+    notes = f"_{objective}_{algorithm}"
     print("Dataset", dataset_folder)
     if not pt.started():
         pt.init()
@@ -88,7 +90,7 @@ def main(dataset_folder, at, cache_bow, fp_16):
         bow = lambda x:x
         notes += "_cache_bow"
     
-    sparse_retriver = SparseRetriever(sparse_collection, bow, BM25WeightingModel())
+    sparse_retriver = SparseRetriever(sparse_collection, bow, BM25WeightingModel(), objective=objective, algorithm=algorithm)
 
     # load a large number of questions
     print("Num questions", len(questions))
