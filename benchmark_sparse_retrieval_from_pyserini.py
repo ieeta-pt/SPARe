@@ -26,9 +26,11 @@ from pyserini.analysis import Analyzer, get_lucene_analyzer
 @click.argument("at", type=int)
 @click.option("--cache_bow", is_flag=True)
 @click.option("--fp_16", is_flag=True)
-def main(dataset_folder, at, cache_bow, fp_16):
+@click.option("--objective", default="accuracy")
+@click.option("--algorithm", default="dot")
+def main(dataset_folder, at, cache_bow, fp_16, objective, algorithm):
     print("Dataset", dataset_folder)
-    notes = ""
+    notes = f"_{objective}_{algorithm}"
     index_reader = IndexReader(f"{dataset_folder}/anserini_index")
     analyzer = Analyzer(get_lucene_analyzer())
     
@@ -79,7 +81,7 @@ def main(dataset_folder, at, cache_bow, fp_16):
         bow = lambda x:x
         notes += "_cache_bow"
     
-    sparse_retriver = SparseRetriever(sparse_collection, bow, BM25WeightingModel())
+    sparse_retriver = SparseRetriever(sparse_collection, bow, BM25WeightingModel(), objective=objective, algorithm=algorithm)
 
     print("Num questions", len(questions))
     
@@ -98,6 +100,13 @@ def main(dataset_folder, at, cache_bow, fp_16):
     with open(f"results/sparse_retriever_from_pyserini_devices_{'-'.join(sparse_collection.backend.devices)}{notes}.csv", "a") as fOut:
         print("Total retrieve time", (e-s), "QPS", len(questions)/(e-s))
         fOut.write(f"{dataset_folder},{at},{len(questions)/(e-s)},{r_evaluate['ndcg@10']},{r_evaluate['ndcg@1000']},{r_evaluate['recall@1000']},{times[0]},{times[1]}\n")
+    
+    if r_evaluate['ndcg@10'] < 0.01:
+        print("write bug")
+        
+        import pickle 
+        with open("bug_singl_gpu.pickcle", "wb") as f:
+            pickle.dump(out, f)
     
 if __name__=="__main__":
     main()
