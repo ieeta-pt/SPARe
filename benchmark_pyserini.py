@@ -41,24 +41,24 @@ def main(dataset_folder, at, threads):
     time_list = []
     st = time.time()
     
-    if threads==1:
-        for question in tqdm(questions):
+    #if threads==1:
+    #    for question in tqdm(questions):
 
-            hits = searcher.search(question.lower(), k=at)
+    #        hits = searcher.search(question.lower(), k=at)
             
-            results.append(list(map(lambda x:(x.docid, x.score), hits)))
-    else:
-        print("run batch search")
-        #questions = questions[:30]
-        questions_text = list(map(lambda x:x.lower(), questions))
-        #q_ids = list(map(str, range(len(questions))))
-        hits = searcher.batch_search(questions_text, question_ids, k=at, threads=threads)
-        #for x in hits:
-        #    print(x.values)
-        #    break
-        #print(hits)
-        for q_id in question_ids:
-            results.append(list(map(lambda x:(x.docid, x.score), hits[q_id])))
+    #        results.append(list(map(lambda x:(x.docid, x.score), hits)))
+    #else:
+    print("run batch search")
+    #questions = questions[:30]
+    questions_text = list(map(lambda x:x.lower(), questions))
+    #q_ids = list(map(str, range(len(questions))))
+    hits = searcher.batch_search(questions_text, question_ids, k=at, threads=threads)
+    #for x in hits:
+    #    print(x.values)
+    #    break
+    #print(hits)
+    for q_id in question_ids:
+        results.append(list(map(lambda x:(x.docid, x.score), hits[q_id])))
     end_t = time.time()
     
     r_evaluate = evaluate_list(qrels, results, question_ids)

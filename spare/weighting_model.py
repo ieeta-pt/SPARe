@@ -41,7 +41,7 @@ class CountingWeightingSchema(WeightingSchema):
         super().__init__(WeightingSchemaType.counting)
     
     def get_weighting_model(self):
-        raise WeightingModel()
+        return WeightingModel()
     
     def __repr__(self) -> str:
         return "CountingWeightingSchema"

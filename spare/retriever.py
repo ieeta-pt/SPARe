@@ -94,7 +94,7 @@ def build_running_plan(backend, collection, objective="performance", algorithm="
     
 class SparseRetriever:
     
-    def __init__(self, collection, bow, weighting_model=None, objective="accuracy", algorithm="dot"):
+    def __init__(self, collection, bow=None, weighting_model=None, objective="accuracy", algorithm="dot"):
         # apply ranking_model
         if weighting_model is None:
             self.weighting_model = collection.weighting_schema.get_weighting_model()
@@ -102,6 +102,7 @@ class SparseRetriever:
             self.weighting_model = weighting_model
         
         self.backend = collection.backend
+
         self.bow = bow
         
         self.collection = self.weighting_model.transform_collection(collection)
@@ -114,7 +115,14 @@ class SparseRetriever:
         top_k = min(top_k, self.collection.shape[0])
         
         def query_transform(query):
-            return self.weighting_model.transform_query(self.bow(query))
+            
+            if self.bow is not None:
+                query = self.bow(query)
+                
+            if not isinstance(query, dict):
+                raise ValueError(f"Bag-of-word representation for the query is {query}, expected to be a dict. Do not forget to pass the bow argument when constructing a SparseRetriever.")
+                
+            return self.weighting_model.transform_query(query)
         
         running_function = self.running_plan.running_func
         

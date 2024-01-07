@@ -9,6 +9,7 @@ import numpy as np
 import psutil
 import gc
 import concurrent.futures
+import os
 
 def thread_inference_loop(sparse_model, top_k, device, question_dataset_class, data, bow, rank):
     
@@ -406,13 +407,28 @@ class CSRSparseRetrievalModelIterative(torch.nn.Module):
 
         #print("DEBUG: DATA TYPE", self.storage_dtype)
         
-        print("Torch convert tensors from CSR to CSC")
-        csc_tensor = torch.sparse_csr_tensor(*sparse_collection.sparse_vecs, sparse_collection.shape).to_sparse_csc()
-
-        self.ccol = torch.nn.parameter.Parameter(csc_tensor.ccol_indices(), requires_grad=False)
-        self.rindices = torch.nn.parameter.Parameter(csc_tensor.row_indices(), requires_grad=False)
-        self.cvalues = torch.nn.parameter.Parameter(csc_tensor.values(), requires_grad=False)
+        #TODO BE CAREFULLY CHANGE TO CACHE INDEX FOR ECIR PUB CHANGE THIS LATER ON
+        _path_csc_cache = os.path.join(sparse_collection.folder_name, "csc_tensors.safetensor")
+        if os.path.exists(_path_csc_cache):
+            print("Load CSC cached matrix")
+            ccol_indices, row_indices, values = sparse_collection.backend.load_tensors_from_file(_path_csc_cache)
+        else:
+            print("Torch convert tensors from CSR to CSC")
+            csc_tensor = torch.sparse_csr_tensor(*sparse_collection.sparse_vecs, sparse_collection.shape).to_sparse_csc()
+            ccol_indices = csc_tensor.ccol_indices()
+            row_indices = csc_tensor.row_indices()
+            values = csc_tensor.values()
+            
+            sparse_collection.backend.save_tensors_to_file([ccol_indices,row_indices, values], _path_csc_cache)
+        
+        self.ccol = torch.nn.parameter.Parameter(ccol_indices, requires_grad=False)
+        self.rindices = torch.nn.parameter.Parameter(row_indices, requires_grad=False)
+        self.cvalues = torch.nn.parameter.Parameter(values, requires_grad=False)
+        
+        #TODO dummy_param was for using SPMD check if it no longer needed!
         self.dummy_param = torch.nn.Parameter(torch.empty(0), requires_grad=True)
+        
+        
         self.top_k = top_k
         self.shape = sparse_collection.shape
         

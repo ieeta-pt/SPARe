@@ -44,20 +44,24 @@ def main(dataset_folder, at):
         time_list = []
         st = time.time()
         
-        for question in tqdm(questions):
-            
-            questions_dataframe = pd.DataFrame([{"qid":0, "query":question.lower()}])
-
-            df_results = bm25_pipe.transform(questions_dataframe)
-            
-            results.append((df_results["docno"], df_results["score"]))
+        q_transformed_list = []
+        for i,question in enumerate(questions):
+            q_transformed_list.append({"qid":question_ids[i], "query":question.lower()})
+        
+        questions_dataframe = pd.DataFrame(q_transformed_list)
+        #print(questions_dataframe)
+        df_results = bm25_pipe.transform(questions_dataframe)
+        
+        questions_results = defaultdict(list)
+        df_results.groupby("qid").apply(lambda x: questions_results[x.iloc[0]["qid"]].extend(zip(x["docno"], x["score"])))
+        questions_ids, results = zip(*questions_results.items())
         
         end_t = time.time()
         
         #correct format
-        results = [list(zip(r[0].tolist(), r[1].tolist())) for r in results]
+        #results = [list(zip(r[0].tolist(), r[1].tolist())) for r in results]
         
-        r_evaluate = evaluate_list(qrels, results, question_ids)
+        r_evaluate = evaluate_list(qrels, results, questions_ids)
         print(r_evaluate)
         fOut.write(f"{dataset_folder},{at},{len(questions)/(end_t-st)},{r_evaluate['ndcg@10']},{r_evaluate['ndcg@1000']},{r_evaluate['recall@1000']}\n")
 

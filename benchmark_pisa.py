@@ -18,7 +18,7 @@ def main(dataset_folder, at, threads):
     
     index = PisaIndex(f"./{dataset_folder}/pisa_index/")
     
-    threshold_for_at = {10:99999, 100:99999, 1000:99999, 10000:99999999, 100000:60}
+    threshold_for_at = {10:99999, 100:99999, 1000:99999, 10000:9999, 100000:60}
 
     qrels = defaultdict(dict)
     run = {}
@@ -35,7 +35,11 @@ def main(dataset_folder, at, threads):
     # for large ats, pyterrier would be to slow
     # so we for now just run on a small question subset
     
-    with open(f"results/pyterrier_pisa.csv", "a") as fOut:
+    out_file_name = "pyterrier_pisa"
+    if threads>1:
+        out_file_name += f"_mp{threads}"
+    
+    with open(f"results/{out_file_name}.csv", "a") as fOut:
         questions = questions#[:200]
 
         bm25 = index.bm25(k1=1.2, b=0.75, num_results=at, threads=threads)
@@ -45,23 +49,28 @@ def main(dataset_folder, at, threads):
         time_list = []
         
         
-        questions_dataframe = pd.DataFrame([{"qid":i, "query":question.lower()} for i,question in enumerate(questions)])
+        questions_dataframe = pd.DataFrame([{"qid":question_ids[i], "query":question.lower()} for i,question in enumerate(questions)])
         
         st = time.time()
         df_results = bm25.transform(questions_dataframe)
         end_s_t = time.time()
-        for i in range(len(questions)):
-            q_df_results = df_results[df_results["qid"]==i]
-            results.append((q_df_results["docno"], q_df_results["score"]))
+        questions_results = defaultdict(list)
+        #for i in range(len(questions)):
+            #q_df_results = df_results[df_results["qid"]==i]
+        #    q_df_results = df_results[i:i+at]
+        #    results.append((q_df_results["docno"].tolist(), q_df_results["score"].tolist()))
+        df_results.groupby("qid").apply(lambda x: questions_results[x.iloc[0]["qid"]].extend(zip(x["docno"], x["score"])))
+        questions_ids, results = zip(*questions_results.items())
+        
         end_t = time.time()
         
         print("SEARCH", end_s_t-st, "SEARCH QPS", len(questions)/(end_s_t-st), "FIXING RESULTS", end_t-end_s_t)
         print("QPS", len(questions)/(end_t-st))
         
         #correct format
-        results = [list(zip(r[0].tolist(), r[1].tolist())) for r in results]
+        #results = [list(zip(*r)) for r in results]
         
-        r_evaluate = evaluate_list(qrels, results, question_ids)
+        r_evaluate = evaluate_list(qrels, results, questions_ids)
         print(r_evaluate)
         fOut.write(f"{dataset_folder},{at},{len(questions)/(end_t-st)},{r_evaluate['ndcg@10']},{r_evaluate['ndcg@1000']},{r_evaluate['recall@1000']}\n")
 

@@ -261,6 +261,8 @@ class AbstractSparseCollection:
         sparse_collection.nnz = nnz
         sparse_collection.shape = shape
         sparse_collection.density = density 
+        # TODO hotfix folder_name do to ECIR deadline pls fix later
+        sparse_collection.folder_name = folder_name
         
         sparse_collection.metadata.load_from_file(os.path.join(folder_name, "metadata.p"))
         sparse_collection.weighting_schema.load_from_file(os.path.join(folder_name, "weight_schema.jsonpickle"))
