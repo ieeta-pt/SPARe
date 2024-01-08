@@ -438,7 +438,7 @@ class CSRSparseRetrievalModelIterative(torch.nn.Module):
     #    self.rindices = self.rindices.to(device)
     #    self.cvalues = self.cvalues.to(device)
     #    return super().to(device)
-    
+    #@torch.compile
     def forward(self, indices, values):
         
         indices = indices.squeeze(0)
@@ -460,7 +460,7 @@ class CSRSparseRetrievalModelIterative(torch.nn.Module):
 
         #return torch.topk(accumulated, 10)
         
-        accumulated = torch.zeros(self.shape[0], dtype=self.storage_dtype).to(indices.device)
+        accumulated = torch.zeros(self.shape[0], dtype=self.storage_dtype, device=indices.device)#.to()
         
         for i, (strat_idx, end_idx) in enumerate(zip(self.ccol[indices], self.ccol[indices+1])):
             v_indices = self.rindices[strat_idx: end_idx]
