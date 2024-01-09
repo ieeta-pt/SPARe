@@ -45,7 +45,7 @@ def main(dataset_folder, at, threads):
         print("read")
         #questions_dataframe = pd.read_csv("msmarco-passage-splade-pisa/questions_tokinezed.csv")[:threshold_for_at[at]]
         questions_data = []
-        with open(f"{dataset_folder}/splade_msmarco_questions_bow.jsonl") as f:
+        with open(f"{dataset_folder}/splade_questions_bow.jsonl") as f:
             for q in map(json.loads, f):
                 questions_data.append({
                     "qid":q["docno"], 

@@ -408,7 +408,7 @@ class CSRSparseRetrievalModelIterative(torch.nn.Module):
         #print("DEBUG: DATA TYPE", self.storage_dtype)
         
         #TODO BE CAREFULLY CHANGE TO CACHE INDEX FOR ECIR PUB CHANGE THIS LATER ON
-        _path_csc_cache = os.path.join(sparse_collection.folder_name, "csc_tensors.safetensor")
+        _path_csc_cache = os.path.join(sparse_collection.folder_name, f"csc_tensors_{self.storage_dtype}.safetensor")
         if os.path.exists(_path_csc_cache):
             print("Load CSC cached matrix")
             ccol_indices, row_indices, values = sparse_collection.backend.load_tensors_from_file(_path_csc_cache)
@@ -460,7 +460,7 @@ class CSRSparseRetrievalModelIterative(torch.nn.Module):
 
         #return torch.topk(accumulated, 10)
         
-        accumulated = torch.zeros(self.shape[0], dtype=self.storage_dtype, device=indices.device)#.to()
+        accumulated = torch.zeros(self.shape[0], dtype=self.storage_dtype, device=indices.device)
         
         for i, (strat_idx, end_idx) in enumerate(zip(self.ccol[indices], self.ccol[indices+1])):
             v_indices = self.rindices[strat_idx: end_idx]
