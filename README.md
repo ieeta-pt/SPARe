@@ -1,30 +1,44 @@
-# sparse-retrieval
-python package for performing sparse-retrieval on accelerated hardware
+# SPARe
+⚠️ **Warning**: This repository is currently under development and it will be official presentation/released on 24-28th March (ECIR 2024). Please note that certain features might be unstable, and the documentation may be incomplete during this phase.
 
+## Overview
+SPARe is an innovative approach to enhancing the efficiency of lexical retrievers through the utilization of GPU acceleration with sparse kernels. This project aims to offer significant advancements in the field of Information Retrieval.
 
-## Reproduce benchmarks
+## Features
+- [List of main features]
+- [Details about GPU optimization]
+- [Other notable aspects of the project]
 
-### Installation
+## Installation
+Instructions on how to install and set up SPARe.
 
-```bash
-python -m venv venv
-source venv/bin/activate
-pip install --upgrade pip
-pip install .[benchmarks]
-```
+\```bash
+pip install git+https://github.com/ieeta-pt/SPARe.git
+\```
 
-Note, you may also need to install python[your-version]-dev and java package if its not available on your system already. 
-Disclaimer, python3.11 fails to install some dependencies. The code was only tested on python 3.10.13
-### Prepare the data
+## Usage
+Detailed guidelines on how to use SPARe in various scenarios.
 
-```bash
-bash build_datasets.sh
+\```bash
+# Example usage commands
+\```
 
-```
+## Contributing
+Guidelines for contributing to SPARe, including coding standards, pull request process, etc.
 
-### Run the benchmarks
+## License
+Information about the licensing of SPARe.
 
-```bash
-bash benchmarks.sh
+## Citation
+If you use SPARe in your research, please cite it using the following format:
 
-```
+\```bibtex
+@article{authors2024spare,
+  title={SPARe: Supercharged Lexical Retrievers on GPU with Sparse Kernels},
+  author={Almeida, Tiago
+and Matos, S{\'e}rgio},
+  journal={Journal/Conference},
+  year={2024}
+}
+\```
+
