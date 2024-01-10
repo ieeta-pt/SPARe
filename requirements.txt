@@ -1,3 +1,0 @@
-torch
-beir
-python-terrier
