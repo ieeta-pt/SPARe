@@ -1,5 +1,5 @@
 # SPARe
-⚠️ **Warning**: This repository is currently under development and it will be official presentation/released on 24-28th March (ECIR 2024). Please note that certain features might be unstable, and the documentation may be incomplete during this phase.
+⚠️ **Warning**: This repository is currently under development and it will be official presented/released on 24-28th March (ECIR 2024). Please note that certain features might be unstable, and the documentation may be incomplete during this phase.
 
 ## Overview
 SPARe is an innovative approach to enhancing the efficiency of lexical retrievers through the utilization of GPU acceleration with sparse kernels. This project aims to offer significant advancements in the field of Information Retrieval.
