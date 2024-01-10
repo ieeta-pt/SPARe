@@ -12,16 +12,16 @@ SPARe is an innovative approach to enhancing the efficiency of lexical retriever
 ## Installation
 Instructions on how to install and set up SPARe.
 
-\```bash
+```bash
 pip install git+https://github.com/ieeta-pt/SPARe.git
-\```
+```
 
 ## Usage
 Detailed guidelines on how to use SPARe in various scenarios.
 
-\```bash
+```bash
 # Example usage commands
-\```
+```
 
 ## Contributing
 Guidelines for contributing to SPARe, including coding standards, pull request process, etc.
@@ -32,7 +32,7 @@ Information about the licensing of SPARe.
 ## Citation
 If you use SPARe in your research, please cite it using the following format:
 
-\```bibtex
+```bibtex
 @article{authors2024spare,
   title={SPARe: Supercharged Lexical Retrievers on GPU with Sparse Kernels},
   author={Almeida, Tiago
@@ -40,5 +40,5 @@ and Matos, S{\'e}rgio},
   journal={Journal/Conference},
   year={2024}
 }
-\```
+```
 
