@@ -11,7 +11,7 @@ SPARe is an innovative approach to enhancing the efficiency of lexical retriever
 
 - **Supported Backends:**
   - PyTorch
-  - [Work in Progress] Jax
+  - [WIP] Jax
 
 - **Compatibility:**
   - **Pyserini:** Converts Anserini indices into SPARe collections.
