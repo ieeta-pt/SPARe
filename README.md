@@ -19,7 +19,7 @@ SPARe is an innovative approach to enhancing the efficiency of lexical retriever
 
 - **Additional Features to Note:**
   - Parallelism (SPMD, [Planned] Tensor)
-  - Hardware-aware searching: Optimizes retrieval strategies based on the available hardware resources.
+  - [WIP] Hardware-aware searching: Optimizes retrieval strategies based on the available hardware resources.
   - Collection sharding: Allows collections to be divided into smaller segments to manage memory constraints more effectively (currently undergoing performance validation).
 
 
