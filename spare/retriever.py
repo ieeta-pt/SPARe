@@ -3,7 +3,7 @@ from tqdm import tqdm
 import numpy as np
 import math
 from dataclasses import dataclass
-from spare import type_to_str
+from spare.utils import type_to_str
 from typing import Callable, Tuple
 
 @dataclass

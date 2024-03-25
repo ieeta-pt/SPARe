@@ -1,4 +1,4 @@
-from spare import TYPE
+from spare.utils import TYPE
 from spare.backend import AbstractBackend, RetrievalOutput
 import torch
 from safetensors.torch import save_file
@@ -408,10 +408,19 @@ class CSRSparseRetrievalModelIterative(torch.nn.Module):
         #print("DEBUG: DATA TYPE", self.storage_dtype)
         
         #TODO BE CAREFULLY CHANGE TO CACHE INDEX FOR ECIR PUB CHANGE THIS LATER ON
-        _path_csc_cache = os.path.join(sparse_collection.folder_name, f"csc_tensors_{self.storage_dtype}.safetensor")
-        if os.path.exists(_path_csc_cache):
-            print("Load CSC cached matrix")
-            ccol_indices, row_indices, values = sparse_collection.backend.load_tensors_from_file(_path_csc_cache)
+        if hasattr(sparse_collection, "folder_name"):
+            _path_csc_cache = os.path.join(sparse_collection.folder_name, f"csc_tensors_{self.storage_dtype}.safetensor")
+            if os.path.exists(_path_csc_cache):
+                print("Load CSC cached matrix")
+                ccol_indices, row_indices, values = sparse_collection.backend.load_tensors_from_file(_path_csc_cache)
+            else:
+                print("Torch convert tensors from CSR to CSC")
+                csc_tensor = torch.sparse_csr_tensor(*sparse_collection.sparse_vecs, sparse_collection.shape).to_sparse_csc()
+                ccol_indices = csc_tensor.ccol_indices()
+                row_indices = csc_tensor.row_indices()
+                values = csc_tensor.values()
+                
+                sparse_collection.backend.save_tensors_to_file([ccol_indices,row_indices, values], _path_csc_cache)
         else:
             print("Torch convert tensors from CSR to CSC")
             csc_tensor = torch.sparse_csr_tensor(*sparse_collection.sparse_vecs, sparse_collection.shape).to_sparse_csc()
@@ -419,8 +428,6 @@ class CSRSparseRetrievalModelIterative(torch.nn.Module):
             row_indices = csc_tensor.row_indices()
             values = csc_tensor.values()
             
-            sparse_collection.backend.save_tensors_to_file([ccol_indices,row_indices, values], _path_csc_cache)
-        
         self.ccol = torch.nn.parameter.Parameter(ccol_indices, requires_grad=False)
         self.rindices = torch.nn.parameter.Parameter(row_indices, requires_grad=False)
         self.cvalues = torch.nn.parameter.Parameter(values, requires_grad=False)

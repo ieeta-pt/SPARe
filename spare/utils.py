@@ -1,7 +1,28 @@
-from spare import TYPE
+
 import math
 import numpy as np
+from enum import Enum
 
+class TYPE(Enum):
+    int32 = 1
+    int64 = 2
+    float16 = 3
+    float32 = 4
+    uint8 = 5
+
+def type_to_str(datatype):
+    if datatype==TYPE.uint8:
+        return "spare.uint8"
+    elif datatype==TYPE.int32:
+        return "spare.int32"
+    elif datatype==TYPE.int64:
+        return "spare.int64"
+    elif datatype==TYPE.float16:
+        return "spare.float16"
+    elif datatype==TYPE.float32:
+        return "spare.float32"
+    else:
+        raise RuntimeError(f"{datatype} is not valid")
 
 
 def maybe_init(class_or_insatnce):

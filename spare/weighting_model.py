@@ -1,9 +1,9 @@
 from enum import Enum
 import json
 from typing import Any
-from spare import TYPE
+
 from tqdm import tqdm
-from spare.utils import idf_weighting
+from spare.utils import idf_weighting, TYPE
 from spare.metadata import MetaDataDFandDL
 import jsonpickle
 

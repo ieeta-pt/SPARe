@@ -1,5 +1,5 @@
-from spare import TYPE
-from spare.utils import get_coo_sparse_GB, get_csr_sparse_GB, load_backend, maybe_init
+
+from spare.utils import get_coo_sparse_GB, get_csr_sparse_GB, load_backend, maybe_init, TYPE
 from tqdm import tqdm
 from spare.metadata import MetaDataDFandDL
 import os
@@ -120,13 +120,15 @@ class AbstractSparseCollection:
     
     def _build_sparse_collection(self, iterator, max_files_for_estimation):
         
+        max_files_for_estimation = min(max_files_for_estimation, self.collection_maxsize)
+
         if self.text_to_vec is None:
             list_bow_for_estimation = [next(iterator) for _ in tqdm(range(max_files_for_estimation), desc="Size estimation")]
         else:
             def remap(docid, text):
                 return docid, self.text_to_vec(text)
             list_bow_for_estimation = [remap(*next(iterator)) for _ in tqdm(range(max_files_for_estimation), desc="Size estimation")]
-        
+
         shape, density = self._get_matrix_estimations(list_bow_for_estimation)
         self.shape = shape
         self.density_estimation = density 
