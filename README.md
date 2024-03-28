@@ -190,12 +190,22 @@ Currently, Apache License 2.0
 If you use SPARe in your research, please cite it using the following format:
 
 ```bibtex
-@article{authors2024spare,
-  title={SPARe: Supercharged Lexical Retrievers on GPU with Sparse Kernels},
-  author={Almeida, Tiago
-and Matos, S{\'e}rgio},
-  journal={Journal/Conference},
-  year={2024}
-}
-```
+@InProceedings{10.1007/978-3-031-56063-7_33,
+author="Almeida, Tiago
+and Matos, S{\'e}rgio",
+editor="Goharian, Nazli
+and Tonellotto, Nicola
+and He, Yulan
+and Lipani, Aldo
+and McDonald, Graham
+and Macdonald, Craig
+and Ounis, Iadh",
+title="SPARe: Supercharged Lexical Retrievers on GPU with Sparse Kernels",
+booktitle="Advances in Information Retrieval",
+year="2024",
+publisher="Springer Nature Switzerland",
+address="Cham",
+pages="413--421",
+isbn="978-3-031-56063-7"
+}```
 
